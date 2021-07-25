@@ -1,0 +1,12 @@
+[package]
+name = "iron-age"
+version = "0.1.0"
+authors = ["Riley Stewart <rileystewart@protonmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+iron-derive = { path = "iron-derive", version = "0.1.0" }
+
+[workspace]
