@@ -51,6 +51,12 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
+        // impl<T> Debug for T where T: IronId {
+        //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //         f.write_str(format!("#name_id({})", self.0).as_str())
+        //     }
+        // }
+
         #[derive(IronData)]
         #parsed_input
 
@@ -69,10 +75,11 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let expanded = quote! {
-        impl #impl_generics crate::game::IronData<#name_id> for #name #ty_generics #where_clause {
+        impl #impl_generics crate::game::IronData for #name #ty_generics #where_clause {
             type DataType = #name;
+            type IdType = #name_id;
 
-            fn id(&self) -> #name_id {
+            fn id(&self) -> Self::IdType {
                 self.id.clone()
             }
         }

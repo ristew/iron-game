@@ -1,4 +1,7 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, ops::Deref, rc::{Rc, Weak}};
+use lazy_static::lazy_static;
+use crate::probability::*;
+
 pub struct Coordinate {
     x: isize,
     y: isize,
@@ -29,6 +32,7 @@ pub enum Climate {
     Cold,
 }
 
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub enum GoodType {
     Wheat,
     Barley,
@@ -49,6 +53,33 @@ pub enum GoodType {
     Textiles,
     LuxuryClothes,
     Slaves, // ?? how to handle
+}
+
+pub use GoodType::*;
+
+lazy_static! {
+    pub static ref FOOD_GOODS: Vec<GoodType> = vec![
+        Wheat,
+        Barley,
+        Fish,
+        OliveOil,
+        Salt,
+        Wine,
+    ];
+}
+
+impl GoodType {
+    pub fn base_satiety(&self) -> Satiety {
+        match *self {
+            Wheat => Satiety { base: 1.0, luxury: 0.1 },
+            Barley => Satiety { base: 1.0, luxury: 0.0 },
+            OliveOil => Satiety { base: 0.5, luxury: 0.5 },
+            Fish => Satiety { base: 0.8, luxury: 0.2 },
+            Wine => Satiety { base: 0.1, luxury: 1.0 },
+            Salt => Satiety { base: 0.3, luxury: 0.5 },
+            _ => Satiety { base: 0.0, luxury: 0.0 },
+        }
+    }
 }
 
 #[iron_data]
@@ -86,24 +117,103 @@ pub struct Settlement {
     level: SettlementLevel,
 }
 
-pub struct KidBuffer(VecDeque<usize>);
+pub struct KidBuffer(VecDeque<isize>);
 
 impl KidBuffer {
     pub fn new() -> Self {
         let mut deque = VecDeque::new();
         Self(deque)
     }
-    pub fn spawn(&mut self, babies: usize) -> usize {
+    pub fn spawn(&mut self, babies: isize) -> isize {
         self.0.push_front(babies);
-        if (self.0.len() > 12) {
+        if self.0.len() > 12 {
             self.0.pop_back().unwrap()
         } else {
             babies / 2
         }
     }
+
+    pub fn starve(&mut self) {
+        let cohort = sample(3.0).abs().min(12.0) as usize;
+        if self.0.len() > cohort {
+            let cohort_size = self.0[cohort];
+            self.0[cohort] = (cohort_size - positive_isample(cohort_size / 40 + 1, cohort_size / 10 + 1)).max(0);
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub struct Satiety {
+    base: f64,
+    luxury: f64,
+}
+
+impl std::ops::Add for Satiety {
+    type Output = Satiety;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Satiety {
+            base: self.base + rhs.base,
+            luxury: self.luxury + rhs.luxury,
+        }
+    }
+}
+
+impl std::ops::Mul<Satiety> for f64 {
+    type Output = Satiety;
+
+    fn mul(self, rhs: Satiety) -> Self::Output {
+        Satiety {
+            base: rhs.base * self,
+            luxury: rhs.luxury * self,
+        }
+    }
 }
 
 pub struct GoodStorage(HashMap<GoodType, f64>);
+
+impl GoodStorage {
+    pub fn amount(&self, good: GoodType) -> f64 {
+        *self.0.get(&good).unwrap_or(&0.0)
+    }
+
+    pub fn consume(&mut self, good: GoodType, amount: f64) -> Option<f64> {
+        if let Some(mut stored) = self.0.get_mut(&good) {
+            if *stored < amount {
+                let deficit = amount - *stored;
+                *stored = 0.0;
+                Some(deficit)
+            } else {
+                *stored -= amount;
+                None
+            }
+        } else {
+            Some(amount)
+        }
+    }
+
+    // pub fn try_eat_diet(&self, diet: Diet) -> Vec<(GoodType, f64)> {
+    //     let mut bad_res = Vec::new();
+
+    //     for part in diet.0.iter() {
+    //         if self.amount(part.0) < part.1 {
+    //             bad_res.push(*part);
+    //         }
+    //     }
+
+    //     bad_res
+    // }
+    //
+}
+
+pub struct Diet {
+    goods: Vec<(GoodType, f64)>,
+    satiety: f64,
+}
+
+impl Diet {
+}
+
 
 #[iron_data]
 pub struct Pop {
@@ -114,6 +224,50 @@ pub struct Pop {
     coordinate: Coordinate,
     kid_buffer: KidBuffer,
     owned_goods: GoodStorage,
+    satiety: Satiety,
+}
+
+impl Pop {
+    pub fn good_satiety(&self, good: GoodType) -> Satiety {
+        good.base_satiety()
+    }
+}
+
+pub fn pop_eat(pop: &PopId, world: &World) {
+    let pop = world.pops.get_ref(&pop);
+    let mut total_satiety = Satiety {
+        base: 0.0,
+        luxury: 0.0,
+    };
+    let target_base = 5.0;
+    while total_satiety.base < target_base {
+        let mut added = 0.0;
+        for good in FOOD_GOODS.iter().rev() {
+            // use up to 1.0 of each good?
+            let mut amt = 1.0;
+            if let Some(deficit) = pop.borrow_mut().owned_goods.consume(*good, 1.0) {
+                amt -= deficit;
+            }
+            added += amt;
+            total_satiety = total_satiety + amt * pop.borrow().good_satiety(*good);
+
+            if total_satiety.base > target_base {
+                break;
+            }
+        }
+        if added < 0.01 {
+            break;
+        }
+    }
+
+    if total_satiety.base < 5.0 {
+        let deficit = (5.0 - total_satiety.base).powi(2).round() as isize;
+        for _i in 0..deficit {
+            pop.borrow_mut().kid_buffer.starve();
+        }
+    }
+
+    pop.borrow_mut().satiety = total_satiety;
 }
 
 enum CultureFeature {
@@ -168,19 +322,21 @@ pub trait IronId {
     fn new(id: usize) -> Self;
 }
 
-pub trait IronData<Id> {
-    type DataType;
 
-    fn id(&self) -> Id;
+pub trait IronData {
+    type DataType;
+    type IdType: Eq + Hash;
+
+    fn id(&self) -> Self::IdType;
 }
 
-pub struct Storage<T, Id> where T: IronData<Id>, Id: Eq + Hash {
+pub struct Storage<T, Id> where T: IronData, Id: Eq + Hash + Debug + IronId<Target = T> {
     id_ctr: usize,
     rcs: Vec<Rc<RefCell<T>>>,
     id_map: HashMap<Id, Weak<RefCell<T>>>,
 }
 
-impl<T, Id> Storage<T, Id> where T: IronData<Id>, Id: IronId + Eq + Hash + IronId<Target = T> {
+impl<T, Id> Storage<T, Id> where T: IronData<IdType = Id>, Id: Eq + Hash + Debug + IronId<Target = T> {
     fn insert(&mut self, item: T) -> Weak<RefCell<T>> {
         let rc = Rc::new(RefCell::new(item));
         self.rcs.push(rc.clone());
@@ -206,9 +362,16 @@ impl<T, Id> Storage<T, Id> where T: IronData<Id>, Id: IronId + Eq + Hash + IronI
 
         // }
     }
+
+    pub fn remove(&mut self, id: &Id) {
+        self.id_map.remove(id);
+        for removed in self.rcs.drain_filter(|item| item.borrow().id() == *id) {
+            println!("removed item: {:?}", removed.borrow().id());
+        }
+    }
 }
 
-impl<T, Id> Default for Storage<T, Id> where T: IronData<Id>, Id: Eq + Hash {
+impl<T, Id> Default for Storage<T, Id> where T: IronData, Id: Eq + Hash + Debug + IronId<Target = T> {
     fn default() -> Self {
         Self {
             id_ctr: 0,
@@ -283,7 +446,7 @@ pub trait Command {
 }
 
 pub struct PopGrowthCommand {
-    amount: usize,
+    amount: isize,
     pop: PopId,
 }
 
@@ -292,6 +455,9 @@ impl Command for PopGrowthCommand {
         let pop_rc = world.pops.get_ref(&self.pop);
         let adults = pop_rc.borrow_mut().kid_buffer.spawn(self.amount) as isize;
         pop_rc.borrow_mut().size += adults;
+        if pop_rc.borrow().size <= 0 {
+            // world.pops.remove
+        }
     }
 }
 
@@ -299,9 +465,10 @@ pub fn pops_yearly_growth(world: &World) {
     for pop_ref in world.pops.id_map.values() {
         let pop_rc = pop_ref.upgrade().unwrap();
         println!("pop size: {}", pop_rc.borrow().size);
-        let babies = pop_rc.borrow().size * 4 / 100;
+        let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
+        let deaths = positive_isample(2, pop_rc.borrow().size / 50);
         world.add_command(Box::new(PopGrowthCommand {
-            amount: babies.unsigned_abs(),
+            amount: babies - deaths,
             pop: pop_rc.borrow().id.clone(),
         }));
     }
@@ -340,6 +507,11 @@ pub fn create_test_world(world: &mut World) {
         settlement: settlement_id.clone(),
         coordinate: Coordinate::new(10, 10),
         kid_buffer: KidBuffer::new(),
+        owned_goods: GoodStorage(HashMap::new()),
+        satiety: Satiety {
+            base: 0.0,
+            luxury: 0.0,
+        },
     });
 
     world.settlements.insert(Settlement {
@@ -354,8 +526,10 @@ pub fn create_test_world(world: &mut World) {
 
 pub fn day_tick(world: &World) {
     if world.is_year() {
+        println!("year {}", world.day / 360);
         pops_yearly_growth(world);
     }
+
 }
 
 pub fn game_loop() {
@@ -367,6 +541,13 @@ pub fn game_loop() {
         world.day += 1;
         // println!("day {}", world.day);
         day_tick(&world);
+
+        if world.is_month() {
+            println!("month {}", (world.day / 30) % 12);
+            for pop in world.pops.id_map.keys() {
+                pop_eat(pop, &world);
+            }
+        }
         world.process_command_queue();
     }
 }
