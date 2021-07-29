@@ -10,6 +10,7 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
     let name = &parsed_input.ident;
     let name_id = format_ident!("{}Id", name);
     let name_ptr = format_ident!("{}Ptr", name);
+    let name_id_str = format!("{}", name_id);
 
     let expanded = quote! {
         #[derive(Clone)]
@@ -25,7 +26,7 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
         impl Debug for #name_id {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(format!("#name_id({})", self.0).as_str())
+                f.write_str(format!("{}({})", #name_id_str, self.0).as_str())
             }
         }
 
