@@ -1,11 +1,14 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
 use lazy_static::lazy_static;
 use crate::probability::*;
+use crate::commands::*;
+use crate::world::*;
+use crate::storage::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Coordinate {
-    x: isize,
-    y: isize,
+    pub x: isize,
+    pub y: isize,
 }
 
 impl Coordinate {
@@ -163,15 +166,15 @@ impl GoodType {
 
 #[iron_data]
 pub struct Province {
-    id: ProvinceId,
-    settlements: Vec<SettlementId>,
-    terrain: Terrain,
-    climate: Climate,
-    coordinate: Coordinate,
-    harvest_month: usize,
+    pub id: ProvinceId,
+    pub settlements: Vec<SettlementId>,
+    pub terrain: Terrain,
+    pub climate: Climate,
+    pub coordinate: Coordinate,
+    pub harvest_month: usize,
 }
 
-enum SettlementFeature {
+pub enum SettlementFeature {
     Hilltop,
     Riverside,
     Oceanside,
@@ -190,7 +193,7 @@ impl Factored for SettlementFeature {
     }
 }
 
-enum SettlementLevel {
+pub enum SettlementLevel {
     Hamlet,
     Village,
     Town,
@@ -200,12 +203,13 @@ enum SettlementLevel {
 
 #[iron_data]
 pub struct Settlement {
-    id: SettlementId,
-    name: String,
-    pops: Vec<PopId>,
-    features: Vec<SettlementFeature>,
-    coordinate: Coordinate,
-    level: SettlementLevel,
+    pub id: SettlementId,
+    pub name: String,
+    pub pops: Vec<PopId>,
+    pub features: Vec<SettlementFeature>,
+    pub primary_culture: CultureId,
+    pub coordinate: Coordinate,
+    pub level: SettlementLevel,
 }
 
 impl Settlement {
@@ -250,8 +254,8 @@ impl KidBuffer {
 
 #[derive(PartialEq)]
 pub struct Satiety {
-    base: f64,
-    luxury: f64,
+    pub base: f64,
+    pub luxury: f64,
 }
 
 impl std::ops::Add for Satiety {
@@ -345,15 +349,15 @@ impl Diet {
 
 #[iron_data]
 pub struct Pop {
-    id: PopId,
-    size: isize,
-    culture: CultureId,
-    settlement: SettlementId,
-    coordinate: Coordinate,
-    kid_buffer: KidBuffer,
-    owned_goods: GoodStorage,
-    satiety: Satiety,
-    farmed_good: Option<GoodType>,
+    pub id: PopId,
+    pub size: isize,
+    pub culture: CultureId,
+    pub settlement: SettlementId,
+    pub coordinate: Coordinate,
+    pub kid_buffer: KidBuffer,
+    pub owned_goods: GoodStorage,
+    pub satiety: Satiety,
+    pub farmed_good: Option<GoodType>,
 }
 
 impl Pop {
@@ -413,36 +417,6 @@ impl Command for PopEatCommand {
     }
 }
 
-pub struct AddGoodsCommand {
-    good_type: GoodType,
-    amount: f64,
-    pop: PopId,
-}
-
-impl Command for AddGoodsCommand {
-    fn run(&self, world: &mut World) {
-        println!("add goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
-        let pop = world.pops.get_ref(&self.pop);
-        pop.borrow_mut().owned_goods.add(self.good_type, self.amount);
-        println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
-    }
-}
-
-pub struct SetGoodsCommand {
-    good_type: GoodType,
-    amount: f64,
-    pop: PopId,
-}
-
-impl Command for SetGoodsCommand {
-    fn run(&self, world: &mut World) {
-        println!("set goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
-        let pop = world.pops.get_ref(&self.pop);
-        println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
-        pop.borrow_mut().owned_goods.set(self.good_type, self.amount);
-    }
-}
-
 pub fn harvest(pop: &PopId, world: &World) {
     let pop_rc = world.pops.get_ref(&pop);
     let pop = pop_rc.borrow();
@@ -462,23 +436,23 @@ pub fn harvest(pop: &PopId, world: &World) {
     }
 }
 
-enum CultureFeature {
+pub enum CultureFeature {
     Warrior,
     Seafaring,
 }
 
 #[iron_data]
 pub struct Culture {
-    id: CultureId,
-    name: String,
-    religion: ReligionId,
-    features: Vec<CultureFeature>,
+    pub id: CultureId,
+    pub name: String,
+    pub religion: ReligionId,
+    pub features: Vec<CultureFeature>,
 }
 
 #[iron_data]
 pub struct Religion {
-    id: ReligionId,
-    name: String,
+    pub id: ReligionId,
+    pub name: String,
 }
 
 pub enum Technology {
@@ -514,164 +488,8 @@ pub trait IronData {
     fn id(&self) -> Self::IdType;
 }
 
-pub struct Storage<T, Id> where T: IronData, Id: Eq + Hash + Debug + IronId<Target = T> {
-    id_ctr: usize,
-    rcs: Vec<Rc<RefCell<T>>>,
-    id_map: HashMap<Id, Weak<RefCell<T>>>,
-}
-
-impl<T, Id> Storage<T, Id> where T: IronData<IdType = Id>, Id: Eq + Hash + Debug + IronId<Target = T> {
-    fn insert(&mut self, item: T) -> Weak<RefCell<T>> {
-        let rc = Rc::new(RefCell::new(item));
-        self.rcs.push(rc.clone());
-        self.id_map.insert((*rc).borrow().id(), Rc::downgrade(&rc));
-        Rc::downgrade(&rc)
-    }
-
-    fn get_id(&mut self) -> Id {
-        self.id_ctr += 1;
-        Id::new(self.id_ctr)
-    }
-
-    fn get_ref(&self, id: &Id) -> Rc<RefCell<T>> {
-        if let Some(rc) = id.try_borrow() {
-            rc.clone()
-        } else {
-            let rc = self.id_map.get(&id).unwrap().upgrade().unwrap();
-            id.set_reference(rc.clone());
-            rc
-        }
-        // if id.1.borrow().is_none() {
-        // } else {
-
-        // }
-    }
-
-    pub fn remove(&mut self, id: &Id) {
-        self.id_map.remove(id);
-        for removed in self.rcs.drain_filter(|item| item.borrow().id() == *id) {
-            println!("removed item: {:?}", removed.borrow().id());
-        }
-    }
-}
-
-impl<T, Id> Default for Storage<T, Id> where T: IronData, Id: Eq + Hash + Debug + IronId<Target = T> {
-    fn default() -> Self {
-        Self {
-            id_ctr: 0,
-            rcs: Vec::new(),
-            id_map: HashMap::new(),
-        }
-    }
-}
-
-pub struct Date {
-    day: usize
-}
-
-impl Date {
-    pub fn is_month(&self) -> bool {
-        self.day % 30 == 0
-    }
-
-    pub fn is_year(&self) -> bool {
-        self.day % 360 == 0
-    }
-
-    pub fn month(&self) -> usize {
-        (self.day / 30) % 12
-    }
-
-    pub fn year(&self) -> usize {
-        self.day / 360 + 1
-    }
-
-    pub fn day_of_month(&self) -> usize {
-        self.day % 30 + 1
-    }
-}
-
-impl Debug for Date {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("{}/{}/{}", self.month(), self.day_of_month(), self.year()).as_str())
-    }
-}
-
-pub struct World {
-    date: Date,
-    provinces: Storage<Province, ProvinceId>,
-    province_coord_map: HashMap<Coordinate, ProvinceId>,
-    cultures: Storage<Culture, CultureId>,
-    religions: Storage<Religion, ReligionId>,
-    settlements: Storage<Settlement, SettlementId>,
-    pops: Storage<Pop, PopId>,
-    commands: Rc<RefCell<Vec<Box<dyn Command>>>>
-}
-
-impl World {
-    pub fn add_command(&self, command: Box<dyn Command>) {
-        self.commands.borrow_mut().push(command);
-    }
 
 
-    pub fn process_command_queue(&mut self) {
-        let commands = self.commands.replace(Vec::new());
-        for command in commands {
-            command.run(self);
-        }
-    }
-
-    pub fn insert_province(&mut self, province: Province) {
-        self.province_coord_map.insert(province.coordinate, province.id.clone());
-        self.provinces.insert(province);
-    }
-
-    pub fn get_province_coordinate(&self, coord: Coordinate) -> ProvinceId {
-        self.province_coord_map.get(&coord).unwrap().clone()
-    }
-
-    pub fn insert_settlement(&mut self, settlement: Settlement) {
-        self.provinces.get_ref(&self.get_province_coordinate(settlement.coordinate))
-                      .borrow_mut().settlements.push(settlement.id.clone());
-        self.settlements.insert(settlement);
-    }
-}
-
-impl Default for World {
-    fn default() -> Self {
-        Self {
-            date: Date { day: 0 },
-            provinces: Default::default(),
-            province_coord_map: Default::default(),
-            cultures: Default::default(),
-            religions: Default::default(),
-            settlements: Default::default(),
-            pops: Default::default(),
-            commands: Rc::new(RefCell::new(Vec::new())),
-        }
-    }
-}
-
-pub trait Command {
-    fn run(&self, world: &mut World);
-}
-
-pub struct PopGrowthCommand {
-    babies: isize,
-    deaths: isize,
-    pop: PopId,
-}
-
-impl Command for PopGrowthCommand {
-    fn run(&self, world: &mut World) {
-        let pop_rc = world.pops.get_ref(&self.pop);
-        let adults = pop_rc.borrow_mut().kid_buffer.spawn(self.babies) as isize;
-        pop_rc.borrow_mut().size += adults - self.deaths;
-        if pop_rc.borrow().size <= 0 {
-            // world.pops.remove
-        }
-    }
-}
 
 pub fn pops_yearly_growth(world: &World) {
     for pop_ref in world.pops.id_map.values() {
@@ -741,6 +559,7 @@ pub fn create_test_world(world: &mut World) {
                 name: "Test Town".to_owned(),
                 pops: vec![pop_id.clone()],
                 features: Vec::new(),
+                primary_culture: culture_id.clone(),
                 coordinate,
                 level: SettlementLevel::Village,
             });

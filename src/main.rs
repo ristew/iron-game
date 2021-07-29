@@ -3,7 +3,10 @@
 extern crate iron_derive;
 
 pub mod game;
-mod probability;
+pub mod commands;
+pub mod world;
+pub mod probability;
+pub mod storage;
 
 fn main() {
     game::game_loop();
