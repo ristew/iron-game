@@ -1,14 +1,130 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
+use ggez::{GameError, event::EventHandler, timer};
 use lazy_static::lazy_static;
-use crate::probability::*;
+use rand::{prelude::SliceRandom, thread_rng};
+use crate::{probability::*, render::render_world};
 use crate::commands::*;
 use crate::world::*;
 use crate::storage::*;
+
+const TILE_SIZE_X: f32 = 32.0;
+const TILE_SIZE_Y: f32 = 32.0;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Coordinate {
     pub x: isize,
     pub y: isize,
+}
+
+impl Coordinate {
+    pub fn z(&self) -> isize {
+        -self.x - self.y
+    }
+
+    pub fn pixel_pos(&self) -> (f32, f32) {
+        let tile_x = TILE_SIZE_X * self.x as f32;
+        (tile_x,
+         TILE_SIZE_Y * (self.y as f32 + 1.0) + 0.5 * TILE_SIZE_X * self.x as f32)
+    }
+
+    pub fn from_pixel_pos(x: f32, y: f32) -> Self {
+        let coord_x = (x - 10.0) / (TILE_SIZE_X - 10.0);
+        let coord_y = y / TILE_SIZE_Y - 0.5 * coord_x - 1.0;
+        Self::from_cube_round(coord_x, coord_y)
+    }
+
+    pub fn from_cube_round(x: f32, y: f32) -> Self {
+        let z = -x - y;
+        let mut rx = x.round();
+        let mut ry = y.round();
+        let rz = z.round();
+        let xdiff = (rx - x).abs();
+        let ydiff = (ry - y).abs();
+        let zdiff = (rz - z).abs();
+        if xdiff > ydiff + zdiff {
+            rx = -ry - rz;
+        } else if ydiff > zdiff {
+            ry = -rx - rz;
+        // } else {
+        //     rz = -rx - ry;
+        }
+        Self {
+            x: rx as isize,
+            y: ry as isize,
+        }
+    }
+
+
+
+    // pub fn from_window_pos(pos: Vec2, ) -> Self {
+    //     Self::from_pixel_pos(pos)
+    // }
+
+    pub fn neighbors(&self) -> Vec<Coordinate> {
+        let mut ns = Vec::new();
+        let directions = vec![
+            (1, 0),
+            (1, -1),
+            (0, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, 1)
+        ];
+        for (dx, dy) in directions {
+            ns.push(Coordinate {
+                x: self.x + dx,
+                y: self.y + dy,
+            });
+        }
+        ns
+    }
+
+    pub fn neighbors_shuffled(&self) -> Vec<Coordinate> {
+        let mut result = self.neighbors();
+        result.shuffle(&mut thread_rng());
+        result
+    }
+
+    pub fn neighbors_iter(&self) -> CoordinateIter {
+        CoordinateIter {
+            neighbors: self.neighbors(),
+        }
+    }
+
+    pub fn neighbors_shuffled_iter(&self) -> CoordinateIter {
+        CoordinateIter {
+            neighbors: self.neighbors_shuffled(),
+        }
+    }
+
+    pub fn neighbors_in_radius(&self, radius: isize) -> Vec<Coordinate> {
+        let mut items = Vec::new();
+        for x in -radius..(radius + 1) {
+            let min = (-radius).max(-x - radius);
+            let max = radius.min(-x + radius);
+            for y in min..(max + 1) {
+                items.push(Coordinate { x: self.x + x, y: self.y + y });
+            }
+        }
+        items
+    }
+    pub fn neighbors_in_radius_iter(&self, radius: isize) -> CoordinateIter {
+        CoordinateIter {
+            neighbors: self.neighbors_in_radius(radius),
+        }
+    }
+}
+
+pub struct CoordinateIter {
+    neighbors: Vec<Coordinate>,
+}
+
+impl Iterator for CoordinateIter {
+    type Item = Coordinate;
+
+    fn next(&mut self) -> Option<Coordinate> {
+        self.neighbors.pop()
+    }
 }
 
 impl Coordinate {
@@ -488,9 +604,6 @@ pub trait IronData {
     fn id(&self) -> Self::IdType;
 }
 
-
-
-
 pub fn pops_yearly_growth(world: &World) {
     for pop_ref in world.pops.id_map.values() {
         let pop_rc = pop_ref.upgrade().unwrap();
@@ -527,11 +640,11 @@ pub fn create_test_world(world: &mut World) {
             let coordinate = Coordinate::new(i, j);
             world.insert_province(Province {
                 id: province_id,
-                settlements: Vec::new(),
                 terrain: Terrain::Hills,
                 climate: Climate::Mild,
                 coordinate,
                 harvest_month: 8,
+                settlements: Vec::new(),
             });
 
             let settlement_id = world.settlements.get_id();
@@ -540,16 +653,16 @@ pub fn create_test_world(world: &mut World) {
             let pop = world.pops.insert(Pop {
                 id: pop_id.clone(),
                 size: 100,
+                farmed_good: Some(Wheat),
                 culture: culture_id.clone(),
                 settlement: settlement_id.clone(),
                 coordinate,
-                kid_buffer: KidBuffer::new(),
-                owned_goods: GoodStorage(HashMap::new()),
                 satiety: Satiety {
                     base: 0.0,
                     luxury: 0.0,
                 },
-                farmed_good: Some(Wheat),
+                kid_buffer: KidBuffer::new(),
+                owned_goods: GoodStorage(HashMap::new()),
             });
 
             pop.upgrade().unwrap().borrow_mut().owned_goods.add(Wheat, 30000.0);
@@ -592,19 +705,39 @@ pub fn day_tick(world: &World) {
     }
 }
 
-pub fn game_loop() {
-    let mut world: World = Default::default();
+pub struct MainState {
+    world: World,
+}
 
-    create_test_world(&mut world);
+impl MainState {
+    pub fn new() -> Self {
+        let mut world: World = Default::default();
 
-    loop {
-        world.date.day += 1;
-        day_tick(&world);
-
-        if world.date.is_month() {
-            println!("{:?}", world.date);
+        create_test_world(&mut world);
+        Self {
+            world,
         }
-        world.process_command_queue();
-        sleep(Duration::from_millis(2));
+    }
+}
+
+impl EventHandler<GameError> for MainState {
+    fn update(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
+        self.world.date.day += 1;
+        day_tick(&self.world);
+
+        if self.world.date.is_month() {
+            println!("{:?}", self.world.date);
+        }
+        self.world.process_command_queue();
+        // sleep(Duration::from_millis(2));
+        timer::yield_now();
+        timer::sleep(Duration::from_millis(2));
+        Ok(())
+    }
+
+    fn draw(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
+        render_world(&self.world, ctx);
+        timer::yield_now();
+        Ok(())
     }
 }
