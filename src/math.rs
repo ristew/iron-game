@@ -8,6 +8,18 @@ pub struct Point2 {
     pub y: f32,
 }
 
+impl From<ggez::mint::Point2<f32>> for Point2 {
+    fn from(val: ggez::mint::Point2<f32>) -> Self {
+        Self { x: val.x, y: val.y }
+    }
+}
+
+impl Into<ggez::mint::Point2<f32>> for Point2 {
+    fn into(self) -> ggez::mint::Point2<f32> {
+        ggez::mint::Point2 { x: self.x, y: self.y }
+    }
+}
+
 impl Point2 {
     pub fn new(x: f32, y: f32) -> Self {
         Self {

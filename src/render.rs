@@ -1,4 +1,4 @@
-use ggez::{Context, graphics::{Color, DrawMode, DrawParam, FillOptions, Mesh, Rect, StrokeOptions, draw, present}};
+use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, FillOptions, Mesh, Rect, StrokeOptions, draw, present}};
 
 use crate::*;
 
@@ -13,10 +13,19 @@ pub fn render_province(province: &Province, world: &World, ctx: &mut Context) {
     draw(ctx, &hex, DrawParam::new().dest([province_pixel_pos.x, province_pixel_pos.y])).unwrap();
 }
 
-pub fn render_world(world: &World, ctx: &mut Context) {
+pub fn render_world(world: &mut World, ctx: &mut Context) {
     for province in world.provinces.rcs.iter().map(|rc| rc.borrow()) {
         render_province(&province, world, ctx);
     }
+}
+
+pub fn render_ui(world: &World, ctx: &mut Context) {
+    let window_size = graphics::size(ctx);
+    let ui_width = window_size.0 / 3.5;
+    let ui_height = window_size.1;
+
+    let rect = Mesh::new_rectangle(ctx, DrawMode::Fill(Default::default()), Rect::new(0.0, 0.0, ui_width, ui_height), Color::new(0.9, 0.8, 0.6, 0.9)).unwrap();
+    draw(ctx, &rect, DrawParam::default()).unwrap();
 }
 
 #[derive(Debug, Clone)]

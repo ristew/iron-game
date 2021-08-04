@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 
+use ggez::{Context, graphics::{Color, DrawMode, DrawParam, Mesh, MeshBatch, StrokeOptions}};
+
 use crate::*;
 
 pub struct Date {
@@ -62,9 +64,10 @@ impl World {
     }
 
     pub fn process_events(&mut self) {
+        self.events.update();
         let events = self.events.events.replace(Vec::new());
         for event in events {
-            if let Some(command) = self.events.event_command_mapper.map_event(event) {
+            if let Some(command) = event.map_event(self) {
                 self.add_command(command);
             }
         }
@@ -84,10 +87,8 @@ impl World {
                       .borrow_mut().settlements.push(settlement.id.clone());
         self.settlements.insert(settlement);
     }
-}
 
-impl Default for World {
-    fn default() -> Self {
+    pub fn new(ctx: &mut Context) -> Self {
         Self {
             date: Date { day: 0 },
             provinces: Default::default(),
@@ -102,7 +103,6 @@ impl Default for World {
         }
     }
 }
-
 
 pub fn create_test_world(world: &mut World) {
     let culture_id = world.cultures.get_id();

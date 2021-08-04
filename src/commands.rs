@@ -95,7 +95,7 @@ impl Command for PopEatCommand {
     }
 }
 
-pub struct MoveCameraCommand(Point2);
+pub struct MoveCameraCommand(pub Point2);
 
 impl Command for MoveCameraCommand {
     fn run(&self, world: &mut World) {
@@ -103,51 +103,3 @@ impl Command for MoveCameraCommand {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]
-pub enum EventKind {
-    KeyDown,
-}
-
-pub trait Event {
-    fn kind(&self) -> EventKind;
-}
-
-pub trait Mapper {
-    fn map_event(&self, event: Box<dyn Event>) -> Option<Box<dyn Command>>;
-}
-
-#[derive(Default)]
-pub struct EventCommandMapper {
-    event_mappers: HashMap<EventKind, Box<dyn Mapper>>,
-}
-
-impl EventCommandMapper {
-    pub fn map_event(&self, event: Box<dyn Event>) -> Option<Box<dyn Command>> {
-        if let Some(event_mapper) = self.event_mappers.get(&event.kind()) {
-            event_mapper.map_event(event)
-        } else {
-            None
-        }
-    }
-}
-
-pub struct Events {
-    pub event_command_mapper: EventCommandMapper,
-    pub events: Rc<RefCell<Vec<Box<dyn Event>>>>,
-}
-
-impl Default for Events {
-    fn default() -> Self {
-        Self {
-            event_command_mapper: Default::default(),
-            events: Default::default(),
-        }
-    }
-}
-
-impl Events {
-    pub fn add(&self, event: Box<dyn Event>) {
-        self.events.borrow_mut().push(event);
-    }
-
-}

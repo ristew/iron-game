@@ -1,5 +1,5 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
-use ggez::{GameError, event::EventHandler, graphics::{Color, clear, present}, timer};
+use ggez::{Context, GameError, event::EventHandler, graphics::{Color, clear, present}, timer};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
 use crate::*;
@@ -18,10 +18,14 @@ impl Coordinate {
         -self.x - self.y
     }
 
-    pub fn pixel_pos(&self, camera: &Camera) -> Point2 {
+    pub fn base_pixel_pos(&self) -> Point2 {
         let tile_x = TILE_SIZE_X * (SQRT_3 * self.x as f32 + SQRT_3 / 2.0 * self.y as f32);
         let tile_y = TILE_SIZE_Y * 1.5 * self.y as f32;
-        camera.translate(Point2::new(tile_x, tile_y))
+        Point2::new(tile_x, tile_y)
+    }
+
+    pub fn pixel_pos(&self, camera: &Camera) -> Point2 {
+        camera.translate(self.base_pixel_pos())
     }
 
     // pub fn from_pixel_pos(x: f32, y: f32) -> Self {
@@ -420,7 +424,7 @@ impl GoodStorage {
     }
 
     pub fn add(&mut self, good: GoodType, amount: f64) -> f64 {
-        if let Some(mut stored) = self.0.get_mut(&good) {
+        if let Some(stored) = self.0.get_mut(&good) {
             *stored += amount;
             *stored
         } else {
@@ -446,15 +450,6 @@ impl GoodStorage {
     // }
     //
 }
-
-pub struct Diet {
-    goods: Vec<(GoodType, f64)>,
-    satiety: f64,
-}
-
-impl Diet {
-}
-
 
 pub enum Technology {
     Farming,
@@ -494,8 +489,8 @@ pub struct MainState {
 }
 
 impl MainState {
-    pub fn new() -> Self {
-        let mut world: World = Default::default();
+    pub fn new(ctx: &mut Context) -> Self {
+        let mut world: World = World::new(ctx);
 
         create_test_world(&mut world);
         Self {
@@ -504,8 +499,14 @@ impl MainState {
     }
 }
 
+pub const FPS: f32 = 120.0;
+pub const FRAME_TIME: f32 = 1.0 / FPS;
+
 impl EventHandler<GameError> for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
+        if timer::delta(ctx).as_secs_f32() < FRAME_TIME {
+            timer::sleep(Duration::from_secs_f32(FRAME_TIME) - timer::delta(ctx));
+        }
         self.world.date.day += 1;
         day_tick(&self.world);
 
@@ -513,17 +514,16 @@ impl EventHandler<GameError> for MainState {
             println!("{:?}", self.world.date);
             println!("{:?}", self.world.camera.p);
         }
-        self.world.camera.p.x += 0.01;
+        self.world.process_events();
         self.world.process_command_queue();
-        // sleep(Duration::from_millis(2));
         timer::yield_now();
-        timer::sleep(Duration::from_millis(2));
         Ok(())
     }
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
         clear(ctx, Color::BLACK);
-        render_world(&self.world, ctx);
+        render_world(&mut self.world, ctx);
+        render_ui(&mut self.world, ctx);
         present(ctx).unwrap();
         timer::yield_now();
         Ok(())
@@ -557,15 +557,28 @@ impl EventHandler<GameError> for MainState {
         &mut self,
         ctx: &mut ggez::Context,
         keycode: ggez::event::KeyCode,
-        _keymods: ggez::event::KeyMods,
-        _repeat: bool,
+        keymods: ggez::event::KeyMods,
+        repeat: bool,
     ) {
         if keycode == ggez::event::KeyCode::Escape {
             ggez::event::quit(ctx);
+        } else {
+            self.world.events.add(Box::new(KeyDownEvent {
+                keycode,
+                keymods,
+                repeat,
+            }));
+            self.world.events.set_key_down(keycode);
         }
     }
 
-    fn key_up_event(&mut self, _ctx: &mut ggez::Context, _keycode: ggez::event::KeyCode, _keymods: ggez::event::KeyMods) {}
+    fn key_up_event(&mut self, _ctx: &mut ggez::Context, keycode: ggez::event::KeyCode, keymods: ggez::event::KeyMods) {
+        self.world.events.add(Box::new(KeyUpEvent {
+            keycode,
+            keymods,
+        }));
+        self.world.events.set_key_up(keycode);
+    }
 
     fn text_input_event(&mut self, _ctx: &mut ggez::Context, _character: char) {}
 
