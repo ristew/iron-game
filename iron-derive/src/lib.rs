@@ -24,31 +24,33 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
         impl Eq for #name_id {}
 
-        impl Debug for #name_id {
+        impl std::fmt::Debug for #name_id {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str(format!("{}({})", #name_id_str, self.0).as_str())
             }
         }
 
-        impl Hash for #name_id {
+        impl std::hash::Hash for #name_id {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
                 self.0.hash(state);
             }
         }
 
+        pub type #name_ptr = std::rc::Rc<std::cell::RefCell<#name>>;
+
         impl IronId for #name_id {
             type Target = #name;
 
-            fn try_borrow(&self) -> Option<Rc<RefCell<Self::Target>>> {
+            fn try_borrow(&self) -> Option<#name_ptr> {
                 self.1.borrow().as_ref().map(|weak| { weak.upgrade().unwrap().clone() })
             }
 
-            fn set_reference(&self, reference: Rc<RefCell<Self::Target>>) {
-                *self.1.borrow_mut() = Some(Rc::downgrade(&reference));
+            fn set_reference(&self, reference: std::rc::Rc<std::cell::RefCell<Self::Target>>) {
+                *self.1.borrow_mut() = Some(std::rc::Rc::downgrade(&reference));
             }
 
             fn new(id: usize) -> Self {
-                Self(id, RefCell::new(None))
+                Self(id, std::cell::RefCell::new(None))
             }
         }
 
@@ -60,8 +62,6 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
         #[derive(IronData)]
         #parsed_input
-
-        pub type #name_ptr = Rc<RefCell<#name>>;
     };
 
     TokenStream::from(expanded)

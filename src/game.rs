@@ -1,14 +1,11 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
-use ggez::{GameError, event::EventHandler, timer};
+use ggez::{GameError, event::EventHandler, graphics::{Color, clear, present}, timer};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
-use crate::{probability::*, render::render_world};
-use crate::commands::*;
-use crate::world::*;
-use crate::storage::*;
+use crate::*;
 
-const TILE_SIZE_X: f32 = 32.0;
-const TILE_SIZE_Y: f32 = 32.0;
+pub const TILE_SIZE_X: f32 = 16.0;
+pub const TILE_SIZE_Y: f32 = 16.0;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Coordinate {
@@ -21,17 +18,15 @@ impl Coordinate {
         -self.x - self.y
     }
 
-    pub fn pixel_pos(&self) -> (f32, f32) {
-        let tile_x = TILE_SIZE_X * self.x as f32;
-        (tile_x,
-         TILE_SIZE_Y * (self.y as f32 + 1.0) + 0.5 * TILE_SIZE_X * self.x as f32)
+    pub fn pixel_pos(&self, camera: &Camera) -> Point2 {
+        let tile_x = TILE_SIZE_X * (SQRT_3 * self.x as f32 + SQRT_3 / 2.0 * self.y as f32);
+        let tile_y = TILE_SIZE_Y * 1.5 * self.y as f32;
+        camera.translate(Point2::new(tile_x, tile_y))
     }
 
-    pub fn from_pixel_pos(x: f32, y: f32) -> Self {
-        let coord_x = (x - 10.0) / (TILE_SIZE_X - 10.0);
-        let coord_y = y / TILE_SIZE_Y - 0.5 * coord_x - 1.0;
-        Self::from_cube_round(coord_x, coord_y)
-    }
+    // pub fn from_pixel_pos(x: f32, y: f32) -> Self {
+    //     Self::from_cube_round(coord_x, coord_y)
+    // }
 
     pub fn from_cube_round(x: f32, y: f32) -> Self {
         let z = -x - y;
@@ -54,6 +49,12 @@ impl Coordinate {
         }
     }
 
+    pub fn new(x: isize, y: isize) -> Self {
+        Self {
+            x,
+            y
+        }
+    }
 
 
     // pub fn from_window_pos(pos: Vec2, ) -> Self {
@@ -124,15 +125,6 @@ impl Iterator for CoordinateIter {
 
     fn next(&mut self) -> Option<Coordinate> {
         self.neighbors.pop()
-    }
-}
-
-impl Coordinate {
-    pub fn new(x: isize, y: isize) -> Self {
-        Self {
-            x,
-            y
-        }
     }
 }
 
@@ -405,7 +397,7 @@ impl std::ops::Mul<Satiety> for f64 {
     }
 }
 
-pub struct GoodStorage(HashMap<GoodType, f64>);
+pub struct GoodStorage(pub HashMap<GoodType, f64>);
 
 impl GoodStorage {
     pub fn amount(&self, good: GoodType) -> f64 {
@@ -463,113 +455,6 @@ pub struct Diet {
 impl Diet {
 }
 
-#[iron_data]
-pub struct Pop {
-    pub id: PopId,
-    pub size: isize,
-    pub culture: CultureId,
-    pub settlement: SettlementId,
-    pub coordinate: Coordinate,
-    pub kid_buffer: KidBuffer,
-    pub owned_goods: GoodStorage,
-    pub satiety: Satiety,
-    pub farmed_good: Option<GoodType>,
-}
-
-impl Pop {
-    pub fn good_satiety(&self, good: GoodType) -> Satiety {
-        good.base_satiety()
-    }
-
-    pub fn die(&mut self, amount: isize) {
-        println!("die pops: {}", amount);
-        self.size = (self.size - amount).max(0);
-        println!("size: {}", self.size);
-        if self.size == 0 {
-            std::process::exit(0);
-        }
-    }
-}
-
-pub struct PopEatCommand(PopId);
-
-impl Command for PopEatCommand {
-    fn run(&self, world: &mut World) {
-        let pop = world.pops.get_ref(&self.0);
-        let mut total_satiety = Satiety {
-            base: 0.0,
-            luxury: 0.0,
-        };
-        let pop_size = pop.borrow().size;
-        let target_base = 23.0;
-        while total_satiety.base < target_base {
-            let mut added = 0.0;
-            for good in FOOD_GOODS.iter().rev() {
-                let mut amt = pop_size as f64;
-                if let Some(deficit) = pop.borrow_mut().owned_goods.consume(*good, amt) {
-                    amt -= deficit;
-                }
-                added += amt;
-                total_satiety = total_satiety + (amt / pop_size as f64) * pop.borrow().good_satiety(*good);
-
-                if total_satiety.base > target_base {
-                    break;
-                }
-            }
-            if added < 0.01 {
-                break;
-            }
-        }
-
-        if total_satiety.base < 20.0 {
-            pop.borrow_mut().kid_buffer.starve();
-            if pop.borrow().satiety.base < 10.0 {
-                pop.borrow_mut().kid_buffer.starve();
-                pop.borrow_mut().die(positive_isample(1 + pop_size / 40, 2 + pop_size / 20))
-            }
-        }
-
-        pop.borrow_mut().satiety = total_satiety;
-    }
-}
-
-pub fn harvest(pop: &PopId, world: &World) {
-    let pop_rc = world.pops.get_ref(&pop);
-    let pop = pop_rc.borrow();
-    println!("harvest pop?");
-    if let Some(farmed_good) = pop.farmed_good {
-        let mut farmed_amount = pop.size as f64;
-        let carrying_capacity = world.settlements.get_ref(&pop.settlement).borrow().carrying_capacity(world);
-        if farmed_amount > carrying_capacity {
-            farmed_amount = carrying_capacity + (farmed_amount - carrying_capacity).sqrt();
-        }
-        farmed_amount *= 350.0;
-        world.add_command(Box::new(SetGoodsCommand {
-            good_type: farmed_good,
-            amount: farmed_amount,
-            pop: pop.id.clone(),
-        }));
-    }
-}
-
-pub enum CultureFeature {
-    Warrior,
-    Seafaring,
-}
-
-#[iron_data]
-pub struct Culture {
-    pub id: CultureId,
-    pub name: String,
-    pub religion: ReligionId,
-    pub features: Vec<CultureFeature>,
-}
-
-#[iron_data]
-pub struct Religion {
-    pub id: ReligionId,
-    pub name: String,
-}
 
 pub enum Technology {
     Farming,
@@ -604,107 +489,6 @@ pub trait IronData {
     fn id(&self) -> Self::IdType;
 }
 
-pub fn pops_yearly_growth(world: &World) {
-    for pop_ref in world.pops.id_map.values() {
-        let pop_rc = pop_ref.upgrade().unwrap();
-        println!("pop size: {}", pop_rc.borrow().size);
-        let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
-        let deaths = positive_isample(2, pop_rc.borrow().size / 50);
-        world.add_command(Box::new(PopGrowthCommand {
-            babies,
-            deaths,
-            pop: pop_rc.borrow().id.clone(),
-        }));
-    }
-}
-
-pub fn create_test_world(world: &mut World) {
-    let culture_id = world.cultures.get_id();
-    let religion_id = world.religions.get_id();
-
-    world.religions.insert(Religion {
-        id: religion_id.clone(),
-        name: "Test Religion".to_owned(),
-    });
-
-    world.cultures.insert(Culture {
-        id: culture_id.clone(),
-        name: "Test People".to_owned(),
-        religion: religion_id.clone(),
-        features: Vec::new(),
-    });
-    // create provinces
-    for i in 0..5 {
-        for j in 0..5 {
-            let province_id = world.provinces.get_id();
-            let coordinate = Coordinate::new(i, j);
-            world.insert_province(Province {
-                id: province_id,
-                terrain: Terrain::Hills,
-                climate: Climate::Mild,
-                coordinate,
-                harvest_month: 8,
-                settlements: Vec::new(),
-            });
-
-            let settlement_id = world.settlements.get_id();
-            let pop_id = world.pops.get_id();
-
-            let pop = world.pops.insert(Pop {
-                id: pop_id.clone(),
-                size: 100,
-                farmed_good: Some(Wheat),
-                culture: culture_id.clone(),
-                settlement: settlement_id.clone(),
-                coordinate,
-                satiety: Satiety {
-                    base: 0.0,
-                    luxury: 0.0,
-                },
-                kid_buffer: KidBuffer::new(),
-                owned_goods: GoodStorage(HashMap::new()),
-            });
-
-            pop.upgrade().unwrap().borrow_mut().owned_goods.add(Wheat, 30000.0);
-
-            world.insert_settlement(Settlement {
-                id: settlement_id.clone(),
-                name: "Test Town".to_owned(),
-                pops: vec![pop_id.clone()],
-                features: Vec::new(),
-                primary_culture: culture_id.clone(),
-                coordinate,
-                level: SettlementLevel::Village,
-            });
-        }
-    }
-}
-
-pub fn harvest_provinces(world: &World) {
-    for province in world.provinces.rcs.iter() {
-        if world.date.month() == province.borrow().harvest_month {
-            for settlement in province.borrow().settlements.iter() {
-                for pop in world.settlements.get_ref(settlement).borrow().pops.iter() {
-                    harvest(pop, world);
-                }
-            }
-        }
-    }
-}
-
-pub fn day_tick(world: &World) {
-    if world.date.is_year() {
-        pops_yearly_growth(world);
-    }
-
-    if world.date.is_month() {
-        harvest_provinces(world);
-        for pop in world.pops.id_map.keys() {
-            world.add_command(Box::new(PopEatCommand(pop.clone())));
-        }
-    }
-}
-
 pub struct MainState {
     world: World,
 }
@@ -727,7 +511,9 @@ impl EventHandler<GameError> for MainState {
 
         if self.world.date.is_month() {
             println!("{:?}", self.world.date);
+            println!("{:?}", self.world.camera.p);
         }
+        self.world.camera.p.x += 0.01;
         self.world.process_command_queue();
         // sleep(Duration::from_millis(2));
         timer::yield_now();
@@ -736,8 +522,72 @@ impl EventHandler<GameError> for MainState {
     }
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
+        clear(ctx, Color::BLACK);
         render_world(&self.world, ctx);
+        present(ctx).unwrap();
         timer::yield_now();
         Ok(())
     }
+
+    fn mouse_button_down_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _button: ggez::event::MouseButton,
+        _x: f32,
+        _y: f32,
+    ) {
+    }
+
+    fn mouse_button_up_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _button: ggez::event::MouseButton,
+        _x: f32,
+        _y: f32,
+    ) {
+    }
+
+    fn mouse_motion_event(&mut self, _ctx: &mut ggez::Context, _x: f32, _y: f32, _dx: f32, _dy: f32) {}
+
+    fn mouse_enter_or_leave(&mut self, _ctx: &mut ggez::Context, _entered: bool) {}
+
+    fn mouse_wheel_event(&mut self, _ctx: &mut ggez::Context, _x: f32, _y: f32) {}
+
+    fn key_down_event(
+        &mut self,
+        ctx: &mut ggez::Context,
+        keycode: ggez::event::KeyCode,
+        _keymods: ggez::event::KeyMods,
+        _repeat: bool,
+    ) {
+        if keycode == ggez::event::KeyCode::Escape {
+            ggez::event::quit(ctx);
+        }
+    }
+
+    fn key_up_event(&mut self, _ctx: &mut ggez::Context, _keycode: ggez::event::KeyCode, _keymods: ggez::event::KeyMods) {}
+
+    fn text_input_event(&mut self, _ctx: &mut ggez::Context, _character: char) {}
+
+    fn gamepad_button_down_event(&mut self, _ctx: &mut ggez::Context, _btn: ggez::event::Button, _id: ggez::event::GamepadId) {}
+
+    fn gamepad_button_up_event(&mut self, _ctx: &mut ggez::Context, _btn: ggez::event::Button, _id: ggez::event::GamepadId) {}
+
+    fn gamepad_axis_event(&mut self, _ctx: &mut ggez::Context, _axis: ggez::event::Axis, _value: f32, _id: ggez::event::GamepadId) {
+    }
+
+    fn focus_event(&mut self, _ctx: &mut ggez::Context, _gained: bool) {}
+
+    fn quit_event(&mut self, _ctx: &mut ggez::Context) -> bool {
+        println!("quit_event() callback called, quitting...");
+        false
+    }
+
+    fn resize_event(&mut self, _ctx: &mut ggez::Context, _width: f32, _height: f32) {}
+
+    fn on_error(&mut self, _ctx: &mut ggez::Context, _origin: ggez::event::ErrorOrigin, _e: GameError) -> bool {
+        true
+    }
+
+
 }

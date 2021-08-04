@@ -1,5 +1,6 @@
-use crate::game::*;
-use crate::world::*;
+use std::{cell::RefCell, collections::{HashMap, VecDeque}, rc::Rc};
+
+use crate::*;
 
 pub trait Command {
     fn run(&self, world: &mut World);
@@ -50,4 +51,103 @@ impl Command for SetGoodsCommand {
         println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
         pop.borrow_mut().owned_goods.set(self.good_type, self.amount);
     }
+}
+
+pub struct PopEatCommand(pub PopId);
+
+impl Command for PopEatCommand {
+    fn run(&self, world: &mut World) {
+        let pop = world.pops.get_ref(&self.0);
+        let mut total_satiety = Satiety {
+            base: 0.0,
+            luxury: 0.0,
+        };
+        let pop_size = pop.borrow().size;
+        let target_base = 23.0;
+        while total_satiety.base < target_base {
+            let mut added = 0.0;
+            for good in FOOD_GOODS.iter().rev() {
+                let mut amt = pop_size as f64;
+                if let Some(deficit) = pop.borrow_mut().owned_goods.consume(*good, amt) {
+                    amt -= deficit;
+                }
+                added += amt;
+                total_satiety = total_satiety + (amt / pop_size as f64) * pop.borrow().good_satiety(*good);
+
+                if total_satiety.base > target_base {
+                    break;
+                }
+            }
+            if added < 0.01 {
+                break;
+            }
+        }
+
+        if total_satiety.base < 20.0 {
+            pop.borrow_mut().kid_buffer.starve();
+            if pop.borrow().satiety.base < 10.0 {
+                pop.borrow_mut().kid_buffer.starve();
+                pop.borrow_mut().die(positive_isample(1 + pop_size / 40, 2 + pop_size / 20))
+            }
+        }
+
+        pop.borrow_mut().satiety = total_satiety;
+    }
+}
+
+pub struct MoveCameraCommand(Point2);
+
+impl Command for MoveCameraCommand {
+    fn run(&self, world: &mut World) {
+        world.camera.p += self.0;
+    }
+}
+
+#[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]
+pub enum EventKind {
+    KeyDown,
+}
+
+pub trait Event {
+    fn kind(&self) -> EventKind;
+}
+
+pub trait Mapper {
+    fn map_event(&self, event: Box<dyn Event>) -> Option<Box<dyn Command>>;
+}
+
+#[derive(Default)]
+pub struct EventCommandMapper {
+    event_mappers: HashMap<EventKind, Box<dyn Mapper>>,
+}
+
+impl EventCommandMapper {
+    pub fn map_event(&self, event: Box<dyn Event>) -> Option<Box<dyn Command>> {
+        if let Some(event_mapper) = self.event_mappers.get(&event.kind()) {
+            event_mapper.map_event(event)
+        } else {
+            None
+        }
+    }
+}
+
+pub struct Events {
+    pub event_command_mapper: EventCommandMapper,
+    pub events: Rc<RefCell<Vec<Box<dyn Event>>>>,
+}
+
+impl Default for Events {
+    fn default() -> Self {
+        Self {
+            event_command_mapper: Default::default(),
+            events: Default::default(),
+        }
+    }
+}
+
+impl Events {
+    pub fn add(&self, event: Box<dyn Event>) {
+        self.events.borrow_mut().push(event);
+    }
+
 }

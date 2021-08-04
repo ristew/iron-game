@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::{fmt::Debug, hash::Hash, rc::{Rc, Weak}};
 
-use crate::game::*;
+use crate::*;
 
 pub struct Storage<T, Id> where T: IronData, Id: Eq + Hash + Debug + IronId<Target = T> {
     id_ctr: usize,

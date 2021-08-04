@@ -10,6 +10,17 @@ pub mod world;
 pub mod probability;
 pub mod storage;
 pub mod render;
+pub mod pops;
+pub mod math;
+
+pub use game::*;
+pub use commands::*;
+pub use world::*;
+pub use probability::*;
+pub use storage::*;
+pub use render::*;
+pub use pops::*;
+pub use math::*;
 
 fn main() {
     let cb = ContextBuilder::new("iron-age", "ristew")
