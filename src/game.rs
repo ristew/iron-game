@@ -523,7 +523,7 @@ impl EventHandler<GameError> for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
         clear(ctx, Color::BLACK);
         render_world(&mut self.world, ctx);
-        render_ui(&mut self.world, ctx);
+        self.world.ui_system.run(ctx);
         present(ctx).unwrap();
         timer::yield_now();
         Ok(())

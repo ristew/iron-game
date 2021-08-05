@@ -13,6 +13,7 @@ pub mod render;
 pub mod pops;
 pub mod math;
 pub mod events;
+pub mod ui;
 
 pub use game::*;
 pub use commands::*;
@@ -23,6 +24,7 @@ pub use render::*;
 pub use pops::*;
 pub use math::*;
 pub use events::*;
+pub use ui::*;
 pub use std::rc::Rc;
 pub use std::cell::RefCell;
 

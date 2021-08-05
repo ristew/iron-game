@@ -42,3 +42,11 @@ impl std::ops::AddAssign for Point2 {
         *self = *self + rhs;
     }
 }
+
+impl std::ops::Mul<f32> for Point2 {
+    type Output = Point2;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Point2::new(rhs * self.x, rhs * self.y)
+    }
+}

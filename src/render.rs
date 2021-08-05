@@ -5,12 +5,15 @@ use crate::*;
 pub fn render_province(province: &Province, world: &World, ctx: &mut Context) {
     let w = SQRT_3 * TILE_SIZE_X;
     let h = 2.0 * TILE_SIZE_Y;
-    let hex = Mesh::new_polygon(ctx, DrawMode::Stroke(StrokeOptions::DEFAULT),
-                                //&[[16.0, 0.0], [32.0, 8.0], [32.0, 24.0], [16.0, 32.0], [0.0, 24.0], [0.0, 8.0]]
+    let hex = Mesh::new_polygon(ctx, DrawMode::Fill(FillOptions::DEFAULT),
                                 &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
                                 , Color::GREEN).unwrap();
+    let hex_outline = Mesh::new_polygon(ctx, DrawMode::Stroke(StrokeOptions::DEFAULT),
+                                &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
+                                , Color::BLACK).unwrap();
     let province_pixel_pos = province.coordinate.pixel_pos(&world.camera);
     draw(ctx, &hex, DrawParam::new().dest([province_pixel_pos.x, province_pixel_pos.y])).unwrap();
+    draw(ctx, &hex_outline, DrawParam::new().dest([province_pixel_pos.x, province_pixel_pos.y])).unwrap();
 }
 
 pub fn render_world(world: &mut World, ctx: &mut Context) {

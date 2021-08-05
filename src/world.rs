@@ -48,6 +48,7 @@ pub struct World {
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
+    pub ui_system: UiSystem,
 }
 
 impl World {
@@ -100,6 +101,7 @@ impl World {
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
+            ui_system: Default::default(),
         }
     }
 }
