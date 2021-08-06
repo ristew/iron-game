@@ -27,6 +27,10 @@ impl Point2 {
             y,
         }
     }
+
+    pub fn zero(&self) -> bool {
+        self.x == 0.0 && self.y == 0.0
+    }
 }
 
 impl std::ops::Add for Point2 {

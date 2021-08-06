@@ -125,7 +125,7 @@ pub fn create_test_world(world: &mut World) {
     for i in 0..25 {
         for j in 0..25 {
             let province_id = world.provinces.get_id();
-            let coordinate = Coordinate::new(i, j);
+            let coordinate = Coordinate::new(i - (j / 2), j);
             world.insert_province(Province {
                 id: province_id,
                 terrain: Terrain::Hills,

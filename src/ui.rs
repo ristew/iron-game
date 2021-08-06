@@ -23,9 +23,11 @@ impl Constraints {
     }
 
     pub fn reconcile(&self, other: Constraints) -> Self {
+        // println!("self: {:?}", self);
+        // println!("other: {:?}", other);
         Self {
-            min_width: self.min_width.min(other.min_width),
-            min_height: self.min_height.min(other.min_height),
+            min_width: self.min_width.max(other.min_width),
+            min_height: self.min_height.max(other.min_height),
             max_width: self.max_width.min(other.max_width),
             max_height: self.max_height.min(other.max_height),
         }
@@ -50,6 +52,9 @@ pub struct BaseUiContainer {
 
 impl Container for BaseUiContainer {
     fn render(&self, ctx: &mut Context, dest: Point2) {
+        if self.layout_size.zero() {
+            return;
+        }
         let rect = Mesh::new_rectangle(
             ctx,
             DrawMode::Fill(Default::default()),
@@ -59,7 +64,7 @@ impl Container for BaseUiContainer {
         let mut base_dest = dest;
         for child in self.children.iter() {
             child.render(ctx, base_dest + self.padding);
-            base_dest += child.size();
+            base_dest.y += child.size().y;
         }
     }
 
@@ -69,6 +74,7 @@ impl Container for BaseUiContainer {
 
     fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints) {
         let constraints = self.constraints.reconcile(parent_constraints);
+        println!("constraints: {:?}", constraints);
         self.layout_size = Point2::new(constraints.min_width, constraints.min_height);
         for child in self.children.iter_mut() {
             child.layout(ctx, constraints);
@@ -148,8 +154,8 @@ impl UiSystem {
     pub fn run(&mut self, ctx: &mut Context) {
         let window_size = graphics::size(ctx);
         self.root_node.layout(ctx, Constraints {
-            min_width: window_size.0,
-            min_height: window_size.1,
+            min_width: 0.0,
+            min_height: 0.0,
             max_width: window_size.0,
             max_height: window_size.1,
         });
@@ -158,8 +164,14 @@ impl UiSystem {
 
     pub fn init(&mut self, ctx: &Context) {
         let text_child = TextContainer::new("test layout", Point2::new(1.0, 1.0));
-        let window_size =
-        let info_panel = BaseUiContainer::new(Point2;:new(1.0, 1.0), Color::new(0.9, 0.8, 0.7, 0.9), Constraints::new())
+        let text_child_2 = TextContainer::new("test layout dos", Point2::new(1.0, 1.0));
+        let window_size = graphics::size(ctx);
+        let window_w = window_size.0 / 3.5;
+        let window_h = window_size.1;
+        let mut info_panel = BaseUiContainer::new(Point2::new(5.0, 5.0), Color::new(0.9, 0.8, 0.7, 0.9), Constraints::new(window_w, window_h, window_w, window_h));
+        info_panel.add_child(Box::new(text_child));
+        info_panel.add_child(Box::new(text_child_2));
+        self.root_node.add_child(Box::new(info_panel));
     }
 }
 

@@ -492,6 +492,7 @@ impl MainState {
     pub fn new(ctx: &mut Context) -> Self {
         let mut world: World = World::new(ctx);
 
+        world.ui_system.init(ctx);
         create_test_world(&mut world);
         Self {
             world,
