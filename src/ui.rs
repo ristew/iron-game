@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text, draw}};
 
-use crate::Point2;
+use crate::*;
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Constraints {
@@ -140,6 +140,14 @@ impl TextContainer {
     }
 }
 
+pub enum UiLabel {
+    ProvinceName(ProvinceId),
+    ProvinceCoordinate(ProvinceId),
+}
+
+pub struct UiLabelContainer;
+// Launch a war targeting $self.target_province.name for the glory of Jebkarbo!
+// macro matches $elf
             // if child_size.x > self_size.x || child_size.y > self_size.y {
             //     self_size = Point2::new(
             //         self_size.x.max(child_size.x).max(constraints.max_width),
@@ -147,9 +155,42 @@ impl TextContainer {
             //     ));
             // }
 
+/**
+ * UI Binding - a hell in your menus
+ * 1. Direct binding - UI component references a game object, that is consulted every draw
+ * 2. Reactive updates - Object changes send Changed(Id) messages to the UI system, which updates the values referred to accordingly
+ * 3. Dirty flags - dirty state is stored for each object updated, and UI checks after that for values to update
+ *
+ * Reactive
+ * wrap borrow_mut in the big pointer in id to queue a changed message for id
+ * send changed messages to ui system
+ * ui system for each changed object checks if it contains reference too it and updates the references
+ * references are to an object's field ??
+ * let pop: PopId = ...;
+ * let text = format!("{} people", object!(pop.size));
+*/
+pub fn parse_path<T: Into<String>>(path: T) {
+
+}
+macro_rules! object {
+	( ex:expr ) => {
+        let path = parse_path(stringify!{$ex})
+	};
+}
 pub struct UiSystem {
     root_node: BaseUiContainer,
 }
+pub struct PopInfoText {
+    container: TextContainer,
+    pop: PopId,
+}
+
+impl PopInfoText {
+    fn review(&mut self, world: &World) {
+        let text = format!("{} people", object!(self.pop.size));
+    }
+}
+
 impl UiSystem {
     pub fn run(&mut self, ctx: &mut Context) {
         let window_size = graphics::size(ctx);
