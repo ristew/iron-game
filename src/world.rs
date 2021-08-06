@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc};
 
 use ggez::{Context, graphics::{Color, DrawMode, DrawParam, Mesh, MeshBatch, StrokeOptions}};
 
@@ -87,6 +87,24 @@ impl World {
         self.provinces.get_ref(&self.get_province_coordinate(settlement.coordinate))
                       .borrow_mut().settlements.push(settlement.id.clone());
         self.settlements.insert(settlement);
+    }
+
+    fn map_id_type_to_storage<T, Id>(&self) -> Storage<T, Id> where T: IronData<IdType = Id>, Id: Eq + Hash + Debug + IronId<Target = T> {
+        macro_rules! typeid_match {
+            ( type1:expr, type2:expr ) => {
+                TypeId::of::<$type1>() == TypeId::of::<$type2>()
+            }
+        }
+        if typeid_match!(T, Pop) {
+            self.pops
+        } else {
+            self.settlements
+        }
+    }
+
+    pub fn get_ref<T, Id>(&self, id: Id) -> Rc<RefCell<T>> where T: IronData<IdType = Id>, Id: Eq + Hash + Debug + IronId<Target = T> {
+        let storage = self.map_id_type_to_storage::<T, Id>();
+        storage.get_ref(&id).clone()
     }
 
     pub fn new(ctx: &mut Context) -> Self {

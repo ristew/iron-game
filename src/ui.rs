@@ -167,13 +167,14 @@ pub struct UiLabelContainer;
  * ui system for each changed object checks if it contains reference too it and updates the references
  * references are to an object's field ??
  * let pop: PopId = ...;
- * let text = format!("{} people", object!(pop.size));
+ * let text = format!("{} people", fieldread!(pop size));
 */
-pub fn parse_path<T: Into<String>>(path: T) {
-
+pub fn parse_path(path: &'static str) {
+    let path_regex = r"((self\.)?\w+)\.(.*)";
 }
+
 macro_rules! object {
-	( ex:expr ) => {
+	( ex:expr p:expr ) => {
         let path = parse_path(stringify!{$ex})
 	};
 }
