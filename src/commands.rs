@@ -14,7 +14,7 @@ pub struct PopGrowthCommand {
 
 impl Command for PopGrowthCommand {
     fn run(&self, world: &mut World) {
-        let pop_rc = world.pops.get_ref(&self.pop);
+        let pop_rc = world.get_ref::<Pop>(&self.pop);
         let adults = pop_rc.borrow_mut().kid_buffer.spawn(self.babies) as isize;
         pop_rc.borrow_mut().size += adults - self.deaths;
         if pop_rc.borrow().size <= 0 {
@@ -32,7 +32,7 @@ pub struct AddGoodsCommand {
 impl Command for AddGoodsCommand {
     fn run(&self, world: &mut World) {
         println!("add goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
-        let pop = world.pops.get_ref(&self.pop);
+        let pop = world.get_ref::<Pop>(&self.pop);
         pop.borrow_mut().owned_goods.add(self.good_type, self.amount);
         println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
     }
@@ -47,7 +47,7 @@ pub struct SetGoodsCommand {
 impl Command for SetGoodsCommand {
     fn run(&self, world: &mut World) {
         println!("set goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
-        let pop = world.pops.get_ref(&self.pop);
+        let pop = world.get_ref::<Pop>(&self.pop);
         println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
         pop.borrow_mut().owned_goods.set(self.good_type, self.amount);
     }
@@ -57,7 +57,7 @@ pub struct PopEatCommand(pub PopId);
 
 impl Command for PopEatCommand {
     fn run(&self, world: &mut World) {
-        let pop = world.pops.get_ref(&self.0);
+        let pop = world.get_ref::<Pop>(&self.0);
         let mut total_satiety = Satiety {
             base: 0.0,
             luxury: 0.0,

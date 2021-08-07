@@ -30,12 +30,13 @@ impl Pop {
 }
 
 pub fn harvest(pop: &PopId, world: &World) {
-    let pop_rc = world.pops.get_ref(pop);
+    let pop_rc = world.get_ref::<Pop>(pop);
+
     let pop = pop_rc.borrow();
     println!("harvest pop?");
     if let Some(farmed_good) = pop.farmed_good {
         let mut farmed_amount = pop.size as f64;
-        let carrying_capacity = world.settlements.get_ref(&pop.settlement).borrow().carrying_capacity(world);
+        let carrying_capacity = world.get_ref::<Settlement>(&pop.settlement).borrow().carrying_capacity(world);
         if farmed_amount > carrying_capacity {
             farmed_amount = carrying_capacity + (farmed_amount - carrying_capacity).sqrt();
         }

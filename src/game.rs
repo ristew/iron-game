@@ -1,4 +1,4 @@
-use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
+use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
 use ggez::{Context, GameError, event::EventHandler, graphics::{Color, clear, present}, timer};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
@@ -326,7 +326,7 @@ pub struct Settlement {
 
 impl Settlement {
     pub fn carrying_capacity(&self, world: &World) -> f64 {
-        let province_rc = world.provinces.get_ref(&world.get_province_coordinate(self.coordinate));
+        let province_rc = world.get_ref::<Province>(&world.get_province_coordinate(self.coordinate));
         let province = province_rc.borrow();
         let factor = FactorType::CarryingCapacity;
         let mut factors = vec![province.terrain.factor(factor), province.climate.factor(factor)];
@@ -469,17 +469,19 @@ impl Hash for TechLevel {
     }
 }
 
+
 pub trait IronId {
-    type Target;
+    type Target: IronData<IdType = Self>;
     fn try_borrow(&self) -> Option<Rc<RefCell<Self::Target>>>;
     fn set_reference(&self, reference: Rc<RefCell<Self::Target>>);
     fn new(id: usize) -> Self;
+    fn num(&self) -> usize;
 }
 
 
 pub trait IronData {
     type DataType;
-    type IdType: Eq + Hash;
+    type IdType: IronId<Target = Self> + Debug;
 
     fn id(&self) -> Self::IdType;
 }

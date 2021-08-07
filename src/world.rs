@@ -1,6 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc};
+use std::{any::TypeId, cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc};
 
 use ggez::{Context, graphics::{Color, DrawMode, DrawParam, Mesh, MeshBatch, StrokeOptions}};
+use anymap::AnyMap;
 
 use crate::*;
 
@@ -36,15 +37,10 @@ impl Debug for Date {
     }
 }
 
-
 pub struct World {
     pub date: Date,
-    pub provinces: Storage<Province, ProvinceId>,
     pub province_coord_map: HashMap<Coordinate, ProvinceId>,
-    pub cultures: Storage<Culture, CultureId>,
-    pub religions: Storage<Religion, ReligionId>,
-    pub settlements: Storage<Settlement, SettlementId>,
-    pub pops: Storage<Pop, PopId>,
+    pub storages: Storages,
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
@@ -76,7 +72,7 @@ impl World {
 
     pub fn insert_province(&mut self, province: Province) {
         self.province_coord_map.insert(province.coordinate, province.id.clone());
-        self.provinces.insert(province);
+        self.insert::<Province>(province);
     }
 
     pub fn get_province_coordinate(&self, coord: Coordinate) -> ProvinceId {
@@ -84,38 +80,25 @@ impl World {
     }
 
     pub fn insert_settlement(&mut self, settlement: Settlement) {
-        self.provinces.get_ref(&self.get_province_coordinate(settlement.coordinate))
+        self.get_ref::<Province>(&self.get_province_coordinate(settlement.coordinate))
                       .borrow_mut().settlements.push(settlement.id.clone());
-        self.settlements.insert(settlement);
+        self.insert::<Settlement>(settlement);
     }
 
-    fn map_id_type_to_storage<T, Id>(&self) -> Storage<T, Id> where T: IronData<IdType = Id>, Id: Eq + Hash + Debug + IronId<Target = T> {
-        macro_rules! typeid_match {
-            ( type1:expr, type2:expr ) => {
-                TypeId::of::<$type1>() == TypeId::of::<$type2>()
-            }
-        }
-        if typeid_match!(T, Pop) {
-            self.pops
-        } else {
-            self.settlements
-        }
+    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>> where T: IronData + 'static {
+        self.storages.get_ref::<T>(id)
     }
 
-    pub fn get_ref<T, Id>(&self, id: Id) -> Rc<RefCell<T>> where T: IronData<IdType = Id>, Id: Eq + Hash + Debug + IronId<Target = T> {
-        let storage = self.map_id_type_to_storage::<T, Id>();
-        storage.get_ref(&id).clone()
+    pub fn insert<T>(&mut self, data: T) -> T::IdType where T: IronData + 'static {
+        // let id = self.storages.get
+        self.storages.insert(data)
     }
 
     pub fn new(ctx: &mut Context) -> Self {
         Self {
             date: Date { day: 0 },
-            provinces: Default::default(),
             province_coord_map: Default::default(),
-            cultures: Default::default(),
-            religions: Default::default(),
-            settlements: Default::default(),
-            pops: Default::default(),
+            storages: Default::default(),
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
@@ -125,15 +108,15 @@ impl World {
 }
 
 pub fn create_test_world(world: &mut World) {
-    let culture_id = world.cultures.get_id();
-    let religion_id = world.religions.get_id();
+    let culture_id = world.storages.get_id::<Culture>();
+    let religion_id = world.storages.get_id::<Religion>();
 
-    world.religions.insert(Religion {
+    world.insert(Religion {
         id: religion_id.clone(),
         name: "Test Religion".to_owned(),
     });
 
-    world.cultures.insert(Culture {
+    world.insert(Culture {
         id: culture_id.clone(),
         name: "Test People".to_owned(),
         religion: religion_id.clone(),
@@ -142,7 +125,7 @@ pub fn create_test_world(world: &mut World) {
     // create provinces
     for i in 0..25 {
         for j in 0..25 {
-            let province_id = world.provinces.get_id();
+            let province_id = world.storages.get_id::<Province>();
             let coordinate = Coordinate::new(i - (j / 2), j);
             world.insert_province(Province {
                 id: province_id,
@@ -153,10 +136,10 @@ pub fn create_test_world(world: &mut World) {
                 settlements: Vec::new(),
             });
 
-            let settlement_id = world.settlements.get_id();
-            let pop_id = world.pops.get_id();
+            let settlement_id = world.storages.get_id::<Settlement>();
+            let pop_id = world.storages.get_id::<Pop>();
 
-            let pop = world.pops.insert(Pop {
+            let pop = world.insert(Pop {
                 id: pop_id.clone(),
                 size: 100,
                 farmed_good: Some(Wheat),
@@ -171,7 +154,7 @@ pub fn create_test_world(world: &mut World) {
                 owned_goods: GoodStorage(HashMap::new()),
             });
 
-            pop.upgrade().unwrap().borrow_mut().owned_goods.add(Wheat, 30000.0);
+            world.get_ref::<Pop>(&pop).borrow_mut().owned_goods.add(Wheat, 30000.0);
 
             world.insert_settlement(Settlement {
                 id: settlement_id.clone(),
@@ -188,7 +171,7 @@ pub fn create_test_world(world: &mut World) {
 
 
 pub fn pops_yearly_growth(world: &World) {
-    for pop_ref in world.pops.id_map.values() {
+    for pop_ref in world.storages.get_storage::<Pop>().id_map.values() {
         let pop_rc = pop_ref.upgrade().unwrap();
         println!("pop size: {}", pop_rc.borrow().size);
         let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
@@ -202,10 +185,10 @@ pub fn pops_yearly_growth(world: &World) {
 }
 
 pub fn harvest_provinces(world: &World) {
-    for province in world.provinces.rcs.iter() {
+    for province in world.storages.get_storage::<Province>().rcs.iter() {
         if world.date.month() == province.borrow().harvest_month {
             for settlement in province.borrow().settlements.iter() {
-                for pop in world.settlements.get_ref(settlement).borrow().pops.iter() {
+                for pop in world.get_ref::<Settlement>(settlement).borrow().pops.iter() {
                     harvest(pop, world);
                 }
             }
@@ -220,8 +203,8 @@ pub fn day_tick(world: &World) {
 
     if world.date.is_month() {
         harvest_provinces(world);
-        for pop in world.pops.id_map.keys() {
-            world.add_command(Box::new(PopEatCommand(pop.clone())));
+        for pop in world.storages.get_storage::<Pop>().rcs.iter() {
+            world.add_command(Box::new(PopEatCommand(pop.borrow().id().clone())));
         }
     }
 }

@@ -30,12 +30,6 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
 
-        impl std::hash::Hash for #name_id {
-            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-                self.0.hash(state);
-            }
-        }
-
         pub type #name_ptr = std::rc::Rc<std::cell::RefCell<#name>>;
 
         impl IronId for #name_id {
@@ -51,6 +45,10 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
             fn new(id: usize) -> Self {
                 Self(id, std::cell::RefCell::new(None))
+            }
+
+            fn num(&self) -> usize {
+                self.0
             }
         }
 
@@ -79,6 +77,7 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
         impl #impl_generics crate::game::IronData for #name #ty_generics #where_clause {
             type DataType = #name;
             type IdType = #name_id;
+            // type StorageType = crate::storage::Storage<Object = #name>;
 
             fn id(&self) -> Self::IdType {
                 self.id.clone()

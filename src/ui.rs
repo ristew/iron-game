@@ -188,7 +188,7 @@ pub struct PopInfoText {
 
 impl PopInfoText {
     fn review(&mut self, world: &World) {
-        let text = format!("{} people", object!(self.pop.size));
+        // let text = format!("{} people", object!(self.pop.size));
     }
 }
 

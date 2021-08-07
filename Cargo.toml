@@ -12,6 +12,8 @@ lazy_static = "1.4.0"
 rand = "0.8.4"
 rand_distr = "0.4.1"
 regex = "*"
+anymap = "0.12.1"
 ggez = "0.6.0"
+strum = { version = "0.21", features = ["derive"] }
 
 [workspace]

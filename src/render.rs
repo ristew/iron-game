@@ -17,7 +17,7 @@ pub fn render_province(province: &Province, world: &World, ctx: &mut Context) {
 }
 
 pub fn render_world(world: &mut World, ctx: &mut Context) {
-    for province in world.provinces.rcs.iter().map(|rc| rc.borrow()) {
+    for province in world.storages.get_storage::<Province>().rcs.iter().map(|rc| rc.borrow()) {
         render_province(&province, world, ctx);
     }
 }
