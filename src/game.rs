@@ -476,6 +476,7 @@ pub trait IronId {
     fn set_reference(&self, reference: Rc<RefCell<Self::Target>>);
     fn new(id: usize) -> Self;
     fn num(&self) -> usize;
+    fn get(&self, world: &World) -> Rc<RefCell<Self::Target>>;
 }
 
 
@@ -488,16 +489,19 @@ pub trait IronData {
 
 pub struct MainState {
     world: World,
+    ui_system: UiSystem,
 }
 
 impl MainState {
     pub fn new(ctx: &mut Context) -> Self {
         let mut world: World = World::new(ctx);
+        let mut ui_system = UiSystem::default();
 
-        world.ui_system.init(ctx);
+        ui_system.init(ctx);
         create_test_world(&mut world);
         Self {
             world,
+            ui_system,
         }
     }
 }
@@ -526,7 +530,7 @@ impl EventHandler<GameError> for MainState {
     fn draw(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
         clear(ctx, Color::BLACK);
         render_world(&mut self.world, ctx);
-        self.world.ui_system.run(ctx);
+        self.ui_system.run(ctx, &self.world);
         present(ctx).unwrap();
         timer::yield_now();
         Ok(())
@@ -554,7 +558,11 @@ impl EventHandler<GameError> for MainState {
 
     fn mouse_enter_or_leave(&mut self, _ctx: &mut ggez::Context, _entered: bool) {}
 
-    fn mouse_wheel_event(&mut self, _ctx: &mut ggez::Context, _x: f32, _y: f32) {}
+    fn mouse_wheel_event(&mut self, _ctx: &mut ggez::Context, _x: f32, y: f32) {
+        if y != 0.0 {
+            self.world.events.add(Box::new(MouseWheelEvent(y)))
+        }
+    }
 
     fn key_down_event(
         &mut self,

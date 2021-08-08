@@ -50,6 +50,10 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
             fn num(&self) -> usize {
                 self.0
             }
+
+            fn get(&self, world: &World) -> Rc<RefCell<Self::Target>> {
+                world.get_ref::<Self::Target>(self)
+            }
         }
 
         // impl<T> Debug for T where T: IronId {

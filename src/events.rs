@@ -9,6 +9,7 @@ pub enum EventKind {
     KeyDown,
     KeyUp,
     KeyHeld,
+    MouseWheel,
 }
 
 pub trait Event {
@@ -119,12 +120,25 @@ impl Event for KeyHeldEvent {
     }
 
     fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+        let d = 2.0 * world.camera.zoom;
         match self.keycode {
-            KeyCode::W => Some(Box::new(MoveCameraCommand(Point2::new(0.0, 1.0)))),
-            KeyCode::A => Some(Box::new(MoveCameraCommand(Point2::new(1.0, 0.0)))),
-            KeyCode::S => Some(Box::new(MoveCameraCommand(Point2::new(0.0, -1.0)))),
-            KeyCode::D => Some(Box::new(MoveCameraCommand(Point2::new(-1.0, 0.0)))),
+            KeyCode::W => Some(Box::new(MoveCameraCommand(Point2::new(0.0, d)))),
+            KeyCode::A => Some(Box::new(MoveCameraCommand(Point2::new(d, 0.0)))),
+            KeyCode::S => Some(Box::new(MoveCameraCommand(Point2::new(0.0, -d)))),
+            KeyCode::D => Some(Box::new(MoveCameraCommand(Point2::new(-d, 0.0)))),
             _ => None,
         }
+    }
+}
+
+pub struct MouseWheelEvent(pub f32);
+
+impl Event for MouseWheelEvent {
+    fn kind(&self) -> EventKind {
+        EventKind::MouseWheel
+    }
+
+    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+        Some(Box::new(ZoomCameraCommand(-self.0 * 0.05)))
     }
 }

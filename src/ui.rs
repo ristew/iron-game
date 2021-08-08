@@ -40,6 +40,7 @@ pub trait Container {
     fn size(&self) -> Point2;
     fn render(&self, ctx: &mut Context, dest: Point2);
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints);
+    fn update(&mut self, world: &World);
 }
 
 pub struct BaseUiContainer {
@@ -74,7 +75,7 @@ impl Container for BaseUiContainer {
 
     fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints) {
         let constraints = self.constraints.reconcile(parent_constraints);
-        println!("constraints: {:?}", constraints);
+        // println!("constraints: {:?}", constraints);
         self.layout_size = Point2::new(constraints.min_width, constraints.min_height);
         for child in self.children.iter_mut() {
             child.layout(ctx, constraints);
@@ -83,6 +84,12 @@ impl Container for BaseUiContainer {
             if child_size.x > self.layout_size.x {
                 self.layout_size.x = child_size.x.max(constraints.max_width);
             }
+        }
+    }
+
+    fn update(&mut self, world: &World) {
+        for child in self.children.iter_mut() {
+            child.update(world);
         }
     }
 
@@ -128,6 +135,9 @@ impl Container for TextContainer {
         let computed_dimensions = self.text.dimensions(ctx);
         self.layout_size = Point2::new(computed_dimensions.w, computed_dimensions.h);
     }
+
+    fn update(&mut self, world: &World) {
+    }
 }
 
 impl TextContainer {
@@ -155,32 +165,6 @@ pub struct UiLabelContainer;
             //     ));
             // }
 
-/**
- * UI Binding - a hell in your menus
- * 1. Direct binding - UI component references a game object, that is consulted every draw
- * 2. Reactive updates - Object changes send Changed(Id) messages to the UI system, which updates the values referred to accordingly
- * 3. Dirty flags - dirty state is stored for each object updated, and UI checks after that for values to update
- *
- * Reactive
- * wrap borrow_mut in the big pointer in id to queue a changed message for id
- * send changed messages to ui system
- * ui system for each changed object checks if it contains reference too it and updates the references
- * references are to an object's field ??
- * let pop: PopId = ...;
- * let text = format!("{} people", fieldread!(pop size));
-*/
-pub fn parse_path(path: &'static str) {
-    let path_regex = r"((self\.)?\w+)\.(.*)";
-}
-
-macro_rules! object {
-	( ex:expr p:expr ) => {
-        let path = parse_path(stringify!{$ex})
-	};
-}
-pub struct UiSystem {
-    root_node: BaseUiContainer,
-}
 pub struct PopInfoText {
     container: TextContainer,
     pop: PopId,
@@ -192,9 +176,54 @@ impl PopInfoText {
     }
 }
 
+pub struct DateContainer(TextContainer);
+
+impl Container for DateContainer {
+    fn size(&self) -> Point2 {
+        self.0.size()
+    }
+
+    fn render(&self, ctx: &mut Context, dest: Point2) {
+        self.0.render(ctx, dest)
+    }
+
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints) {
+        self.0.layout(ctx, constraints)
+    }
+
+    fn update(&mut self, world: &World) {
+        self.0.text = Text::new(format!("{:?}", world.date));
+    }
+}
+
+/**
+ * UI Binding - a hell in your menus
+ * 1. Direct binding - UI component references a game object, that is consulted every draw
+ * 2. Reactive updates - Object changes send Changed(Id) messages to the UI system, which updates the values referred to accordingly
+ * 3. Dirty flags - dirty state is stored for each object updated, and UI checks after that for values to update
+ *
+ * important to note - UI is not showing a million things at once, cache misses are okay
+ *
+ * Reactive
+ * wrap borrow_mut in the big pointer in id to queue a changed message for id
+ * send changed messages to ui system
+ * ui system for each changed object checks if it contains reference too it and updates the references
+ * references are to an object's field ??
+ * let pop: PopId = ...;
+ * let text = format!("{} people", fieldread!(pop size));
+ *
+ * Dirtyish binding
+ * UI Component trait defines a method which runs on UI redraw + world criteria
+ * updates component inner state based on world state
+*/
+pub struct UiSystem {
+    pub root_node: BaseUiContainer,
+}
+
 impl UiSystem {
-    pub fn run(&mut self, ctx: &mut Context) {
+    pub fn run(&mut self, ctx: &mut Context, world: &World) {
         let window_size = graphics::size(ctx);
+        self.root_node.update(world);
         self.root_node.layout(ctx, Constraints {
             min_width: 0.0,
             min_height: 0.0,
@@ -211,6 +240,7 @@ impl UiSystem {
         let window_w = window_size.0 / 3.5;
         let window_h = window_size.1;
         let mut info_panel = BaseUiContainer::new(Point2::new(5.0, 5.0), Color::new(0.9, 0.8, 0.7, 0.9), Constraints::new(window_w, window_h, window_w, window_h));
+        info_panel.add_child(Box::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0)))));
         info_panel.add_child(Box::new(text_child));
         info_panel.add_child(Box::new(text_child_2));
         self.root_node.add_child(Box::new(info_panel));
@@ -219,7 +249,7 @@ impl UiSystem {
 
 impl Default for UiSystem {
     fn default() -> Self {
-        let mut root_node = BaseUiContainer {
+        let root_node = BaseUiContainer {
             children: vec![],
             padding: Point2::new(0.0, 0.0),
             layout_size: Default::default(),

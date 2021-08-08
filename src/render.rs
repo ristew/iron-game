@@ -3,8 +3,8 @@ use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, FillOptions, Me
 use crate::*;
 
 pub fn render_province(province: &Province, world: &World, ctx: &mut Context) {
-    let w = SQRT_3 * TILE_SIZE_X;
-    let h = 2.0 * TILE_SIZE_Y;
+    let w = SQRT_3 * TILE_SIZE_X / world.camera.zoom;
+    let h = 2.0 * TILE_SIZE_Y / world.camera.zoom;
     let hex = Mesh::new_polygon(ctx, DrawMode::Fill(FillOptions::DEFAULT),
                                 &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
                                 , Color::GREEN).unwrap();

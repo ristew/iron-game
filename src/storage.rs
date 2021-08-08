@@ -7,12 +7,6 @@ use strum::{EnumIter, IntoEnumIterator};
 
 use crate::*;
 
-macro_rules! typeid_match {
-    ( $type1:expr, $type2:expr ) => {
-        TypeId::of::<$type1>() == TypeId::of::<$type2>()
-    }
-}
-
 #[derive(Debug, Copy, Clone, EnumIter, PartialEq, Eq, Hash)]
 pub enum StorageType {
     Pop,
@@ -133,29 +127,14 @@ pub struct Storages {
 impl Storages {
     pub fn get_storage<T>(&self) -> &ObjectStorage<T, T::IdType> where T: IronData + 'static {
         self.storages.get(&StorageType::match_type::<T>()).unwrap().downcast_ref::<ObjectStorage<T, T::IdType>>().unwrap()
-        // match StorageType::match_type::<T>() {
-        //     StorageType::Pop => Box::new(self.pops),
-        //     StorageType::Province => Box::new(self.provinces),
-        //     StorageType::Culture => Box::new(self.cultures),
-        //     StorageType::Religion => Box::new(self.religions),
-        //     StorageType::Settlement => Box::new(self.settlements),
-        // }
     }
     pub fn get_storage_mut<T>(&mut self) -> &mut ObjectStorage<T, T::IdType> where T: IronData + 'static {
         self.storages.get_mut(&StorageType::match_type::<T>()).unwrap().downcast_mut::<ObjectStorage<T, T::IdType>>().unwrap()
-    //     match StorageType::match_type::<T>() {
-    //         StorageType::Pop => &mut self.pops,
-    //         StorageType::Province => &mut self.provinces,
-    //         StorageType::Culture => &mut self.cultures,
-    //         StorageType::Religion => &mut self.religions,
-    //         StorageType::Settlement => &mut self.settlements,
-    //     }
     }
     pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>> where T: IronData + 'static {
         self.get_storage::<T>().get_ref(id)
     }
     pub fn insert<T>(&mut self, data: T) -> T::IdType where T: IronData + 'static {
-        // self.storages.get_mut(&TypeId::of::<T>()).unwrap().downcast_mut::<<T as IronData>::StorageType>().unwrap().insert(data);
         self.get_storage_mut::<T>().insert(data)
     }
     pub fn get_id<T>(&mut self) -> T::IdType where T: IronData + 'static {

@@ -1,6 +1,6 @@
-use std::{any::TypeId, cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc};
+use std::{any::TypeId, cell::{Ref, RefCell}, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc};
 
-use ggez::{Context, graphics::{Color, DrawMode, DrawParam, Mesh, MeshBatch, StrokeOptions}};
+use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, StrokeOptions}};
 use anymap::AnyMap;
 
 use crate::*;
@@ -31,6 +31,17 @@ impl Date {
     }
 }
 
+pub fn parse_path(path: &'static str) {
+    let path_regex = r"((self\.)?\w+)\.(.*)";
+
+}
+
+macro_rules! object {
+	( ex:expr p:expr ) => {
+        let path = parse_path(stringify!{$ex})
+	};
+}
+
 impl Debug for Date {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(format!("{}/{}/{}", self.month(), self.day_of_month(), self.year()).as_str())
@@ -44,7 +55,6 @@ pub struct World {
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
-    pub ui_system: UiSystem,
 }
 
 impl World {
@@ -89,6 +99,12 @@ impl World {
         self.storages.get_ref::<T>(id)
     }
 
+    // pub fn map_borrow<T, F, V>(&self, id: &T::IdType, f: F) -> &V where F: Fn(&T) -> &V, T: IronData + 'static {
+    //     let refcell = self.get_ref::<T>(id);
+    //     f(refcell.into_inner())
+
+    // }
+
     pub fn insert<T>(&mut self, data: T) -> T::IdType where T: IronData + 'static {
         // let id = self.storages.get
         self.storages.insert(data)
@@ -102,7 +118,7 @@ impl World {
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
-            ui_system: Default::default(),
+            // ui_system: Default::default(),
         }
     }
 }
