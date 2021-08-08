@@ -39,8 +39,7 @@ pub type ContainerChildren = Vec<Box<dyn Container>>;
 pub trait Container {
     fn size(&self) -> Point2;
     fn render(&self, ctx: &mut Context, dest: Point2);
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints);
-    fn update(&mut self, world: &World);
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World);
 }
 
 pub struct BaseUiContainer {
@@ -73,12 +72,12 @@ impl Container for BaseUiContainer {
         self.layout_size
     }
 
-    fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints) {
+    fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints, world: &World) {
         let constraints = self.constraints.reconcile(parent_constraints);
         // println!("constraints: {:?}", constraints);
         self.layout_size = Point2::new(constraints.min_width, constraints.min_height);
         for child in self.children.iter_mut() {
-            child.layout(ctx, constraints);
+            child.layout(ctx, constraints, world);
             let child_size = child.size();
             self.layout_size.y += child_size.y;
             if child_size.x > self.layout_size.x {
@@ -86,18 +85,16 @@ impl Container for BaseUiContainer {
             }
         }
     }
-
-    fn update(&mut self, world: &World) {
-        for child in self.children.iter_mut() {
-            child.update(world);
-        }
-    }
-
 }
 
 impl BaseUiContainer {
     pub fn add_child(&mut self, child: Box<dyn Container>) -> &mut Self {
         self.children.push(child);
+        self
+    }
+
+    pub fn clear(&mut self) -> &mut Self {
+        self.children.clear();
         self
     }
 
@@ -130,13 +127,10 @@ impl Container for TextContainer {
         ).unwrap();
     }
 
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints) {
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, _world: &World) {
         self.text.set_bounds(Point2::new(constraints.max_width, f32::INFINITY), graphics::Align::Left);
         let computed_dimensions = self.text.dimensions(ctx);
         self.layout_size = Point2::new(computed_dimensions.w, computed_dimensions.h);
-    }
-
-    fn update(&mut self, world: &World) {
     }
 }
 
@@ -187,14 +181,13 @@ impl Container for DateContainer {
         self.0.render(ctx, dest)
     }
 
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints) {
-        self.0.layout(ctx, constraints)
-    }
-
-    fn update(&mut self, world: &World) {
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
         self.0.text = Text::new(format!("{:?}", world.date));
+        self.0.layout(ctx, constraints, world)
     }
 }
+
+pub struct ProvinceInfo(ProvinceId);
 
 /**
  * UI Binding - a hell in your menus
@@ -223,13 +216,12 @@ pub struct UiSystem {
 impl UiSystem {
     pub fn run(&mut self, ctx: &mut Context, world: &World) {
         let window_size = graphics::size(ctx);
-        self.root_node.update(world);
         self.root_node.layout(ctx, Constraints {
             min_width: 0.0,
             min_height: 0.0,
             max_width: window_size.0,
             max_height: window_size.1,
-        });
+        }, world);
         self.root_node.render(ctx, Point2::new(0.0, 0.0));
     }
 
@@ -259,5 +251,18 @@ impl Default for UiSystem {
         Self {
             root_node,
         }
+    }
+}
+
+pub trait UiCommand {
+    fn run(&self, ui_system: &mut UiSystem);
+}
+
+pub struct ShowProvinceInfo(pub ProvinceId);
+
+impl UiCommand for ShowProvinceInfo {
+    fn run(&self, ui_system: &mut UiSystem) {
+        ui_system.root_node.clear();
+
     }
 }
