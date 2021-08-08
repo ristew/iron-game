@@ -20,9 +20,9 @@ impl Pop {
     }
 
     pub fn die(&mut self, amount: isize) {
-        println!("die pops: {}", amount);
+        // println!("die pops: {}", amount);
         self.size = (self.size - amount).max(0);
-        println!("size: {}", self.size);
+        // println!("size: {}", self.size);
         if self.size == 0 {
             std::process::exit(0);
         }
@@ -33,7 +33,7 @@ pub fn harvest(pop: &PopId, world: &World) {
     let pop_rc = pop.get(world);
 
     let pop = pop_rc.borrow();
-    println!("harvest pop?");
+    // println!("harvest pop?");
     if let Some(farmed_good) = pop.farmed_good {
         let mut farmed_amount = pop.size as f64;
         let carrying_capacity = pop.settlement.get(world).borrow().carrying_capacity(world);

@@ -1,5 +1,9 @@
-use std::rc::Rc;
+pub mod container;
+pub mod events;
 
+use std::rc::Rc;
+use container::*;
+use events::*;
 use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text, draw}};
 
 use crate::*;
@@ -34,160 +38,6 @@ impl Constraints {
     }
 }
 
-pub type ContainerChildren = Vec<Box<dyn Container>>;
-
-pub trait Container {
-    fn size(&self) -> Point2;
-    fn render(&self, ctx: &mut Context, dest: Point2);
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World);
-}
-
-pub struct BaseUiContainer {
-    children: ContainerChildren,
-    padding: Point2,
-    layout_size: Point2,
-    background_color: Color,
-    constraints: Constraints,
-}
-
-impl Container for BaseUiContainer {
-    fn render(&self, ctx: &mut Context, dest: Point2) {
-        if self.layout_size.zero() {
-            return;
-        }
-        let rect = Mesh::new_rectangle(
-            ctx,
-            DrawMode::Fill(Default::default()),
-            Rect::new(dest.x, dest.y, self.layout_size.x, self.layout_size.y),
-            self.background_color).unwrap();
-        draw(ctx, &rect, DrawParam::default()).unwrap();
-        let mut base_dest = dest;
-        for child in self.children.iter() {
-            child.render(ctx, base_dest + self.padding);
-            base_dest.y += child.size().y;
-        }
-    }
-
-    fn size(&self) -> Point2 {
-        self.layout_size
-    }
-
-    fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints, world: &World) {
-        let constraints = self.constraints.reconcile(parent_constraints);
-        // println!("constraints: {:?}", constraints);
-        self.layout_size = Point2::new(constraints.min_width, constraints.min_height);
-        for child in self.children.iter_mut() {
-            child.layout(ctx, constraints, world);
-            let child_size = child.size();
-            self.layout_size.y += child_size.y;
-            if child_size.x > self.layout_size.x {
-                self.layout_size.x = child_size.x.max(constraints.max_width);
-            }
-        }
-    }
-}
-
-impl BaseUiContainer {
-    pub fn add_child(&mut self, child: Box<dyn Container>) -> &mut Self {
-        self.children.push(child);
-        self
-    }
-
-    pub fn clear(&mut self) -> &mut Self {
-        self.children.clear();
-        self
-    }
-
-    pub fn new(padding: Point2, background_color: Color, constraints: Constraints) -> Self {
-        Self {
-            children: Vec::new(),
-            padding,
-            layout_size: Point2::new(0.0, 0.0),
-            background_color,
-            constraints,
-        }
-    }
-}
-
-pub struct TextContainer {
-    padding: Point2,
-    layout_size: Point2,
-    text: Text,
-}
-
-impl Container for TextContainer {
-    fn size(&self) -> Point2 {
-        self.layout_size
-    }
-
-    fn render(&self, ctx: &mut Context, dest: Point2) {
-        self.text.draw(
-            ctx,
-            DrawParam::default().dest(dest + self.padding)
-        ).unwrap();
-    }
-
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, _world: &World) {
-        self.text.set_bounds(Point2::new(constraints.max_width, f32::INFINITY), graphics::Align::Left);
-        let computed_dimensions = self.text.dimensions(ctx);
-        self.layout_size = Point2::new(computed_dimensions.w, computed_dimensions.h);
-    }
-}
-
-impl TextContainer {
-    pub fn new(text: &str, padding: Point2) -> Self {
-        Self {
-            padding,
-            layout_size: Point2::default(),
-            text: Text::new(text),
-        }
-    }
-}
-
-pub enum UiLabel {
-    ProvinceName(ProvinceId),
-    ProvinceCoordinate(ProvinceId),
-}
-
-pub struct UiLabelContainer;
-// Launch a war targeting $self.target_province.name for the glory of Jebkarbo!
-// macro matches $elf
-            // if child_size.x > self_size.x || child_size.y > self_size.y {
-            //     self_size = Point2::new(
-            //         self_size.x.max(child_size.x).max(constraints.max_width),
-            //         self_size.y.max(child_size.y).max(constraints.max_height),
-            //     ));
-            // }
-
-pub struct PopInfoText {
-    container: TextContainer,
-    pop: PopId,
-}
-
-impl PopInfoText {
-    fn review(&mut self, world: &World) {
-        // let text = format!("{} people", object!(self.pop.size));
-    }
-}
-
-pub struct DateContainer(TextContainer);
-
-impl Container for DateContainer {
-    fn size(&self) -> Point2 {
-        self.0.size()
-    }
-
-    fn render(&self, ctx: &mut Context, dest: Point2) {
-        self.0.render(ctx, dest)
-    }
-
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
-        self.0.text = Text::new(format!("{:?}", world.date));
-        self.0.layout(ctx, constraints, world)
-    }
-}
-
-pub struct ProvinceInfo(ProvinceId);
 
 /**
  * UI Binding - a hell in your menus
@@ -210,19 +60,26 @@ pub struct ProvinceInfo(ProvinceId);
  * updates component inner state based on world state
 */
 pub struct UiSystem {
-    pub root_node: BaseUiContainer,
+    pub info_panel: BaseUiContainer,
+    pub events: UiEvents,
 }
 
 impl UiSystem {
     pub fn run(&mut self, ctx: &mut Context, world: &World) {
+        let events = self.events.events.replace(Vec::new());
+        for event in events {
+            if let Some(command) = event.map_event(world, self) {
+                command.run(self);
+            }
+        }
         let window_size = graphics::size(ctx);
-        self.root_node.layout(ctx, Constraints {
+        self.info_panel.layout(ctx, Constraints {
             min_width: 0.0,
             min_height: 0.0,
             max_width: window_size.0,
             max_height: window_size.1,
         }, world);
-        self.root_node.render(ctx, Point2::new(0.0, 0.0));
+        self.info_panel.render(ctx, Point2::new(0.0, 0.0));
     }
 
     pub fn init(&mut self, ctx: &Context) {
@@ -235,13 +92,19 @@ impl UiSystem {
         info_panel.add_child(Box::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0)))));
         info_panel.add_child(Box::new(text_child));
         info_panel.add_child(Box::new(text_child_2));
-        self.root_node.add_child(Box::new(info_panel));
+        self.info_panel = info_panel;
+    }
+
+    pub fn click_obscured(&self, point: Point2) -> bool {
+        // println!("root_node layout_size {:?}", self.root_node.layout_size);
+        let mut obscured = true;
+        point.x < self.info_panel.size().x && point.y < self.info_panel.size().y
     }
 }
 
 impl Default for UiSystem {
     fn default() -> Self {
-        let root_node = BaseUiContainer {
+        let info_panel = BaseUiContainer {
             children: vec![],
             padding: Point2::new(0.0, 0.0),
             layout_size: Default::default(),
@@ -249,20 +112,8 @@ impl Default for UiSystem {
             constraints: Constraints::new(0.0, 0.0, f32::INFINITY, f32::INFINITY),
         };
         Self {
-            root_node,
+            info_panel,
+            events: UiEvents::default(),
         }
-    }
-}
-
-pub trait UiCommand {
-    fn run(&self, ui_system: &mut UiSystem);
-}
-
-pub struct ShowProvinceInfo(pub ProvinceId);
-
-impl UiCommand for ShowProvinceInfo {
-    fn run(&self, ui_system: &mut UiSystem) {
-        ui_system.root_node.clear();
-
     }
 }

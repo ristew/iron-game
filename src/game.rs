@@ -28,9 +28,11 @@ impl Coordinate {
         camera.translate(self.base_pixel_pos())
     }
 
-    // pub fn from_pixel_pos(x: f32, y: f32) -> Self {
-    //     Self::from_cube_round(coord_x, coord_y)
-    // }
+    pub fn from_pixel_pos(point: Point2) -> Self {
+        let coord_x = (SQRT_3 / 3.0 * point.x - point.y / 3.0) / TILE_SIZE_X;
+        let coord_y = (2.0 * point.y / 3.0) / TILE_SIZE_Y;
+        Self::from_cube_round(coord_x, coord_y)
+    }
 
     pub fn from_cube_round(x: f32, y: f32) -> Self {
         let z = -x - y;
@@ -326,7 +328,7 @@ pub struct Settlement {
 
 impl Settlement {
     pub fn carrying_capacity(&self, world: &World) -> f64 {
-        let province_rc = world.get_ref::<Province>(&world.get_province_coordinate(self.coordinate));
+        let province_rc = world.get_province_coordinate(self.coordinate).unwrap().get(world);
         let province = province_rc.borrow();
         let factor = FactorType::CarryingCapacity;
         let mut factors = vec![province.terrain.factor(factor), province.climate.factor(factor)];
@@ -343,9 +345,9 @@ impl KidBuffer {
         Self(VecDeque::new())
     }
     pub fn spawn(&mut self, babies: isize) -> isize {
-        println!("spawn babies {}", babies);
+        // println!("spawn babies {}", babies);
         self.0.push_front(babies);
-        println!("{:?}", self);
+        // println!("{:?}", self);
         if self.0.len() > 12 {
             self.0.pop_back().unwrap()
         } else {
@@ -539,10 +541,12 @@ impl EventHandler<GameError> for MainState {
     fn mouse_button_down_event(
         &mut self,
         _ctx: &mut ggez::Context,
-        _button: ggez::event::MouseButton,
-        _x: f32,
-        _y: f32,
+        button: ggez::event::MouseButton,
+        x: f32,
+        y: f32,
     ) {
+        let point = Point2::new(x, y);
+        self.ui_system.events.add(Box::new(MouseButtonDownEvent(point)));
     }
 
     fn mouse_button_up_event(

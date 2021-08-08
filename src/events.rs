@@ -10,6 +10,7 @@ pub enum EventKind {
     KeyUp,
     KeyHeld,
     MouseWheel,
+    MouseButtonDown,
 }
 
 pub trait Event {
@@ -142,3 +143,16 @@ impl Event for MouseWheelEvent {
         Some(Box::new(ZoomCameraCommand(-self.0 * 0.05)))
     }
 }
+
+pub struct MouseButtonDownEvent(pub Point2);
+
+impl Event for MouseButtonDownEvent {
+    fn kind(&self) -> EventKind {
+        EventKind::MouseButtonDown
+    }
+
+    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+        None
+    }
+}
+

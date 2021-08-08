@@ -1,6 +1,6 @@
 use std::{any::TypeId, cell::{Ref, RefCell}, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc};
 
-use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, StrokeOptions}};
+use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, Rect, StrokeOptions}};
 use anymap::AnyMap;
 
 use crate::*;
@@ -55,6 +55,7 @@ pub struct World {
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
+    pub map_on_screen: Rect,
 }
 
 impl World {
@@ -85,12 +86,12 @@ impl World {
         self.insert::<Province>(province);
     }
 
-    pub fn get_province_coordinate(&self, coord: Coordinate) -> ProvinceId {
-        self.province_coord_map.get(&coord).unwrap().clone()
+    pub fn get_province_coordinate(&self, coord: Coordinate) -> Option<ProvinceId> {
+        self.province_coord_map.get(&coord).map(|p| p.clone())
     }
 
     pub fn insert_settlement(&mut self, settlement: Settlement) {
-        self.get_ref::<Province>(&self.get_province_coordinate(settlement.coordinate))
+        self.get_ref::<Province>(&self.get_province_coordinate(settlement.coordinate).unwrap())
                       .borrow_mut().settlements.push(settlement.id.clone());
         self.insert::<Settlement>(settlement);
     }
@@ -118,8 +119,15 @@ impl World {
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
+            map_on_screen: Default::default(),
             // ui_system: Default::default(),
         }
+    }
+
+    pub fn pixel_to_province(&self, pixel: Point2) -> Option<ProvinceId> {
+        let coord = Coordinate::from_pixel_pos(pixel);
+        println!("pixel: {:?} coord: {:?}", pixel, coord);
+        self.get_province_coordinate(coord)
     }
 }
 
