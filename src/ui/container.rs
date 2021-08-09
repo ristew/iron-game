@@ -1,4 +1,4 @@
-use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text, draw}};
+use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Font, Mesh, PxScale, Rect, Text, TextFragment, draw}};
 
 use crate::*;
 
@@ -102,12 +102,21 @@ impl Container for TextContainer {
     }
 }
 
+pub fn new_text(s: String) -> Text {
+    Text::new(TextFragment {
+        text: s,
+        color: Some(Color::BLACK),
+        font: Some(Font::default()),
+        scale: Some(PxScale::from(10.0)),
+    })
+}
+
 impl TextContainer {
     pub fn new(text: &str, padding: Point2) -> Self {
         Self {
             padding,
             layout_size: Point2::default(),
-            text: Text::new(text),
+            text: new_text(text.to_string()),
         }
     }
 
@@ -115,7 +124,7 @@ impl TextContainer {
         Self {
             padding: Point2::default(),
             layout_size: Point2::default(),
-            text: Text::new(""),
+            text: new_text("".to_string()),
         }
     }
 }
@@ -141,8 +150,47 @@ impl Container for DateContainer {
     }
 
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
-        self.0.text = Text::new(format!("{:?}", world.date));
+        self.0.text = new_text(format!("{:?}", world.date));
         self.0.layout(ctx, constraints, world)
+    }
+}
+
+pub struct InfoContainer<T> where T: IronData {
+    pub id: T::IdType,
+    pub mapping: Box::<dyn Fn(Rc<RefCell<T>>, &World) -> String>,
+    pub inner: TextContainer,
+}
+
+impl<T> InfoContainer<T> where T: IronData {
+    pub fn new<F>(id: T::IdType, mapping: F) -> Box<Self> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
+        Box::new(Self {
+            id,
+            mapping: Box::new(mapping),
+            inner: TextContainer::empty(),
+        })
+    }
+
+    pub fn new_world<F>(id: T::IdType, mapping: F) -> Box<Self> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
+        Box::new(Self {
+            id,
+            mapping: Box::new(mapping),
+            inner: TextContainer::empty(),
+        })
+    }
+}
+
+impl<T> Container for InfoContainer<T> where T: IronData {
+    fn size(&self) -> Point2 {
+        self.inner.size()
+    }
+
+    fn render(&self, ctx: &mut Context, dest: Point2) {
+        self.inner.render(ctx, dest)
+    }
+
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
+        self.inner.text = new_text((*self.mapping)(self.id.get(world), world));
+        self.inner.layout(ctx, constraints, world)
     }
 }
 
@@ -150,6 +198,16 @@ pub struct ProvinceInfoContainer {
     pub province: ProvinceId,
     pub mapping: Box::<dyn Fn(Rc<RefCell<Province>>) -> String>,
     pub inner: TextContainer,
+}
+
+impl ProvinceInfoContainer {
+    pub fn new<T>(province: ProvinceId, mapping: T) -> Box<Self> where T: Fn(Rc<RefCell<Province>>) -> String + 'static {
+        Box::new(Self {
+            province,
+            mapping: Box::new(mapping),
+            inner: TextContainer::empty(),
+        })
+    }
 }
 
 impl Container for ProvinceInfoContainer {
@@ -162,7 +220,7 @@ impl Container for ProvinceInfoContainer {
     }
 
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
-        self.inner.text = Text::new((*self.mapping)(self.province.get(world)));
+        self.inner.text = new_text((*self.mapping)(self.province.get(world)));
         self.inner.layout(ctx, constraints, world)
     }
 }

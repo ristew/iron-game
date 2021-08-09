@@ -55,7 +55,7 @@ pub struct World {
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
-    pub map_on_screen: Rect,
+    pub selected_province: Option<ProvinceId>,
 }
 
 impl World {
@@ -91,8 +91,7 @@ impl World {
     }
 
     pub fn insert_settlement(&mut self, settlement: Settlement) {
-        self.get_ref::<Province>(&self.get_province_coordinate(settlement.coordinate).unwrap())
-                      .borrow_mut().settlements.push(settlement.id.clone());
+        settlement.province.get(self).borrow_mut().settlements.push(settlement.id.clone());
         self.insert::<Settlement>(settlement);
     }
 
@@ -119,16 +118,47 @@ impl World {
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
-            map_on_screen: Default::default(),
+            selected_province: Default::default(),
             // ui_system: Default::default(),
         }
     }
 
     pub fn pixel_to_province(&self, pixel: Point2) -> Option<ProvinceId> {
-        let coord = Coordinate::from_pixel_pos(pixel);
-        println!("pixel: {:?} coord: {:?}", pixel, coord);
+        let coord = Coordinate::from_pixel_pos(pixel, &self.camera);
         self.get_province_coordinate(coord)
     }
+}
+
+fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId) {
+    let settlement_id = world.storages.get_id::<Settlement>();
+    let pop_id = world.storages.get_id::<Pop>();
+
+    let pop = world.insert(Pop {
+        id: pop_id.clone(),
+        size: 100,
+        farmed_good: Some(Wheat),
+        culture: culture_id.clone(),
+        settlement: settlement_id.clone(),
+        province: province_id.clone(),
+        satiety: Satiety {
+            base: 0.0,
+            luxury: 0.0,
+        },
+        kid_buffer: KidBuffer::new(),
+        owned_goods: GoodStorage(HashMap::new()),
+    });
+
+    world.get_ref::<Pop>(&pop).borrow_mut().owned_goods.add(Wheat, 30000.0);
+
+    world.insert_settlement(Settlement {
+        id: settlement_id.clone(),
+        name: "Test Town".to_owned(),
+        pops: vec![pop_id.clone()],
+        features: Vec::new(),
+        primary_culture: culture_id.clone(),
+        province: province_id.clone(),
+        level: SettlementLevel::Village,
+    });
 }
 
 pub fn create_test_world(world: &mut World) {
@@ -152,7 +182,7 @@ pub fn create_test_world(world: &mut World) {
             let province_id = world.storages.get_id::<Province>();
             let coordinate = Coordinate::new(i - (j / 2), j);
             world.insert_province(Province {
-                id: province_id,
+                id: province_id.clone(),
                 terrain: Terrain::Hills,
                 climate: Climate::Mild,
                 coordinate,
@@ -160,35 +190,9 @@ pub fn create_test_world(world: &mut World) {
                 settlements: Vec::new(),
             });
 
-            let settlement_id = world.storages.get_id::<Settlement>();
-            let pop_id = world.storages.get_id::<Pop>();
-
-            let pop = world.insert(Pop {
-                id: pop_id.clone(),
-                size: 100,
-                farmed_good: Some(Wheat),
-                culture: culture_id.clone(),
-                settlement: settlement_id.clone(),
-                coordinate,
-                satiety: Satiety {
-                    base: 0.0,
-                    luxury: 0.0,
-                },
-                kid_buffer: KidBuffer::new(),
-                owned_goods: GoodStorage(HashMap::new()),
-            });
-
-            world.get_ref::<Pop>(&pop).borrow_mut().owned_goods.add(Wheat, 30000.0);
-
-            world.insert_settlement(Settlement {
-                id: settlement_id.clone(),
-                name: "Test Town".to_owned(),
-                pops: vec![pop_id.clone()],
-                features: Vec::new(),
-                primary_culture: culture_id.clone(),
-                coordinate,
-                level: SettlementLevel::Village,
-            });
+            for i in 0..3 {
+                add_test_settlement(world, culture_id.clone(), province_id.clone());
+            }
         }
     }
 }
@@ -197,7 +201,7 @@ pub fn create_test_world(world: &mut World) {
 pub fn pops_yearly_growth(world: &World) {
     for pop_ref in world.storages.get_storage::<Pop>().id_map.values() {
         let pop_rc = pop_ref.upgrade().unwrap();
-        println!("pop size: {}", pop_rc.borrow().size);
+        // println!("pop size: {}", pop_rc.borrow().size);
         let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
         let deaths = positive_isample(2, pop_rc.borrow().size / 50);
         world.add_command(Box::new(PopGrowthCommand {

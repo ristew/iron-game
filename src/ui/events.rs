@@ -26,27 +26,33 @@ pub trait UiEvent {
 }
 
 pub trait UiCommand {
-    fn run(&self, ui_system: &mut UiSystem);
+    fn run(&self, world: &World, ui_system: &mut UiSystem);
 }
 
 pub struct ShowProvinceInfo(pub ProvinceId);
 
 impl UiCommand for ShowProvinceInfo {
-    fn run(&self, ui_system: &mut UiSystem) {
+    fn run(&self, world: &World, ui_system: &mut UiSystem) {
+        let province = self.0.get(world);
         ui_system.info_panel.clear();
-        ui_system.info_panel.add_child(Box::new(ProvinceInfoContainer {
-            province: self.0.clone(),
-            mapping: Box::new(|province| format!("{:?}", province.borrow().coordinate)),
-            inner: TextContainer::empty(),
-        }));
+        ui_system.info_panel.add_child(
+            InfoContainer::<Province>::new(self.0.clone(), |province, _| format!("{:?}", province.borrow().coordinate)));
+        ui_system.info_panel.add_child(
+            InfoContainer::<Province>::new(self.0.clone(), |province, w| format!("{:?}", province.borrow().population(w))));
+        for settlement_id in province.borrow().settlements.iter() {
+            ui_system.info_panel.add_child(
+                InfoContainer::<Settlement>::new(settlement_id.clone(), |settlement, _| format!("{}", settlement.borrow().name))
+            );
+            ui_system.info_panel.add_child(
+                InfoContainer::<Settlement>::new(settlement_id.clone(), |settlement, w| format!("{}", settlement.borrow().population(w)))
+            );
+        }
     }
 }
 
 impl UiEvent for MouseButtonDownEvent {
     fn map_event(&self, world: &World, ui_system: &UiSystem) -> Option<Box<dyn UiCommand>> {
-        println!("map click event {:?}", self.0);
         if ui_system.click_obscured(self.0) {
-            println!("click obscured");
             None
         } else if let Some(province_id) = world.pixel_to_province(self.0) {
             Some(Box::new(ShowProvinceInfo(province_id.clone())))

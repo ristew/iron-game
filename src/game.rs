@@ -28,10 +28,11 @@ impl Coordinate {
         camera.translate(self.base_pixel_pos())
     }
 
-    pub fn from_pixel_pos(point: Point2) -> Self {
-        let coord_x = (SQRT_3 / 3.0 * point.x - point.y / 3.0) / TILE_SIZE_X;
-        let coord_y = (2.0 * point.y / 3.0) / TILE_SIZE_Y;
-        Self::from_cube_round(coord_x, coord_y)
+    pub fn from_pixel_pos(point: Point2, camera: &Camera) -> Self {
+        let tile_x = TILE_SIZE_X;
+        let tile_y = TILE_SIZE_Y;
+        let p = camera.reverse_translate(point);
+        Self::from_cube_round((SQRT_3 / 3.0 * p.x - p.y / 3.0) / tile_x, (2.0 * p.y / 3.0) / tile_y)
     }
 
     pub fn from_cube_round(x: f32, y: f32) -> Self {
@@ -288,6 +289,17 @@ pub struct Province {
     pub harvest_month: usize,
 }
 
+impl Province {
+    pub fn population(&self, world: &World) -> isize {
+        let mut total_pop = 0;
+        for settlement_id in self.settlements.iter() {
+            let settlement = settlement_id.get(world);
+            total_pop += settlement.borrow().population(world);
+        }
+        total_pop
+    }
+}
+
 pub enum SettlementFeature {
     Hilltop,
     Riverside,
@@ -322,18 +334,27 @@ pub struct Settlement {
     pub pops: Vec<PopId>,
     pub features: Vec<SettlementFeature>,
     pub primary_culture: CultureId,
-    pub coordinate: Coordinate,
+    pub province: ProvinceId,
     pub level: SettlementLevel,
 }
 
 impl Settlement {
     pub fn carrying_capacity(&self, world: &World) -> f64 {
-        let province_rc = world.get_province_coordinate(self.coordinate).unwrap().get(world);
+        let province_rc = self.province.get(world);
         let province = province_rc.borrow();
         let factor = FactorType::CarryingCapacity;
         let mut factors = vec![province.terrain.factor(factor), province.climate.factor(factor)];
         factors.extend(self.features.iter().map(|f| f.factor(factor)));
         apply_maybe_factors(500.0, factors)
+    }
+
+    pub fn population(&self, world: &World) -> isize {
+        let mut total_pop = 0;
+        for pop_id in self.pops.iter() {
+            let pop = pop_id.get(world);
+            total_pop += pop.borrow().size;
+        }
+        total_pop
     }
 }
 
@@ -520,8 +541,8 @@ impl EventHandler<GameError> for MainState {
         day_tick(&self.world);
 
         if self.world.date.is_month() {
-            println!("{:?}", self.world.date);
-            println!("{:?}", self.world.camera.p);
+            // println!("{:?}", self.world.date);
+            // println!("{:?}", self.world.camera.p);
         }
         self.world.process_events();
         self.world.process_command_queue();
@@ -547,6 +568,9 @@ impl EventHandler<GameError> for MainState {
     ) {
         let point = Point2::new(x, y);
         self.ui_system.events.add(Box::new(MouseButtonDownEvent(point)));
+        if !self.ui_system.click_obscured(point) {
+            self.world.events.add(Box::new(MouseButtonDownEvent(point)));
+        }
     }
 
     fn mouse_button_up_event(

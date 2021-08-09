@@ -144,6 +144,14 @@ impl Event for MouseWheelEvent {
     }
 }
 
+pub struct SelectProvince(ProvinceId);
+
+impl Command for SelectProvince {
+    fn run(&self, world: &mut World) {
+        world.selected_province = Some(self.0.clone());
+    }
+}
+
 pub struct MouseButtonDownEvent(pub Point2);
 
 impl Event for MouseButtonDownEvent {
@@ -152,7 +160,10 @@ impl Event for MouseButtonDownEvent {
     }
 
     fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        None
+        if let Some(province_id) = world.pixel_to_province(self.0) {
+            Some(Box::new(SelectProvince(province_id.clone())))
+        } else {
+            None
+        }
     }
 }
-

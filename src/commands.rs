@@ -31,10 +31,10 @@ pub struct AddGoodsCommand {
 
 impl Command for AddGoodsCommand {
     fn run(&self, world: &mut World) {
-        println!("add goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
+        // println!("add goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
         let pop = world.get_ref::<Pop>(&self.pop);
         pop.borrow_mut().owned_goods.add(self.good_type, self.amount);
-        println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
+        // println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
     }
 }
 
@@ -46,9 +46,9 @@ pub struct SetGoodsCommand {
 
 impl Command for SetGoodsCommand {
     fn run(&self, world: &mut World) {
-        println!("set goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
+        // println!("set goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
         let pop = world.get_ref::<Pop>(&self.pop);
-        println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
+        // println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
         pop.borrow_mut().owned_goods.set(self.good_type, self.amount);
     }
 }

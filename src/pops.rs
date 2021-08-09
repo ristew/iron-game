@@ -7,7 +7,7 @@ pub struct Pop {
     pub size: isize,
     pub culture: CultureId,
     pub settlement: SettlementId,
-    pub coordinate: Coordinate,
+    pub province: ProvinceId,
     pub kid_buffer: KidBuffer,
     pub owned_goods: GoodStorage,
     pub satiety: Satiety,

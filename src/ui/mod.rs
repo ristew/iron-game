@@ -69,7 +69,7 @@ impl UiSystem {
         let events = self.events.events.replace(Vec::new());
         for event in events {
             if let Some(command) = event.map_event(world, self) {
-                command.run(self);
+                command.run(world, self);
             }
         }
         let window_size = graphics::size(ctx);

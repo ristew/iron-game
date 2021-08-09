@@ -8,12 +8,23 @@ pub fn render_province(province: &Province, world: &World, ctx: &mut Context) {
     let hex = Mesh::new_polygon(ctx, DrawMode::Fill(FillOptions::DEFAULT),
                                 &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
                                 , Color::GREEN).unwrap();
-    let hex_outline = Mesh::new_polygon(ctx, DrawMode::Stroke(StrokeOptions::DEFAULT),
-                                &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
-                                , Color::BLACK).unwrap();
+    let hex_outline = Mesh::new_polygon(
+        ctx,
+        DrawMode::Stroke(StrokeOptions::default()),
+        &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
+        , Color::BLACK).unwrap();
     let province_pixel_pos = province.coordinate.pixel_pos(&world.camera);
-    draw(ctx, &hex, DrawParam::new().dest([province_pixel_pos.x, province_pixel_pos.y])).unwrap();
-    draw(ctx, &hex_outline, DrawParam::new().dest([province_pixel_pos.x, province_pixel_pos.y])).unwrap();
+    let hex_dest = [province_pixel_pos.x - w / 2.0, province_pixel_pos.y - h / 2.0];
+    draw(ctx, &hex, DrawParam::new().dest(hex_dest)).unwrap();
+    draw(ctx, &hex_outline, DrawParam::new().dest(hex_dest)).unwrap();
+    if Some(province.id()) == world.selected_province {
+        let selected_line = Mesh::new_line(
+            ctx,
+            &[[w / 2.0, 0.0], [w / 2.0, 8.0 / world.camera.zoom]],
+            4.0 / world.camera.zoom,
+            Color::BLUE).unwrap();
+        draw(ctx, &selected_line, DrawParam::new().dest(hex_dest)).unwrap();
+    }
 }
 
 pub fn render_world(world: &mut World, ctx: &mut Context) {
@@ -49,5 +60,9 @@ impl Default for Camera {
 impl Camera {
     pub fn translate(&self, point: Point2) -> Point2 {
         Point2::new((point.x + self.p.x) / self.zoom, (point.y + self.p.y) / self.zoom)
+    }
+
+    pub fn reverse_translate(&self, point: Point2) -> Point2 {
+        Point2::new(self.zoom * point.x - self.p.x, self.zoom * point.y - self.p.y)
     }
 }
