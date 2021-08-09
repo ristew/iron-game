@@ -35,6 +35,7 @@ impl UiCommand for ShowProvinceInfo {
     fn run(&self, world: &World, ui_system: &mut UiSystem) {
         let province = self.0.get(world);
         ui_system.info_panel.clear();
+        ui_system.info_panel.add_child(Box::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0)))));
         ui_system.info_panel.add_child(
             InfoContainer::<Province>::new(self.0.clone(), |province, _| format!("{:?}", province.borrow().coordinate)));
         ui_system.info_panel.add_child(
@@ -44,7 +45,10 @@ impl UiCommand for ShowProvinceInfo {
                 InfoContainer::<Settlement>::new(settlement_id.clone(), |settlement, _| format!("{}", settlement.borrow().name))
             );
             ui_system.info_panel.add_child(
-                InfoContainer::<Settlement>::new(settlement_id.clone(), |settlement, w| format!("{}", settlement.borrow().population(w)))
+                InfoContainer::<Settlement>::new(
+                    settlement_id.clone(),
+                    |settlement, w| format!("{:?} of {}", settlement.borrow().level, settlement.borrow().population(w))
+                )
             );
         }
     }

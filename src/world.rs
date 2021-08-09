@@ -161,6 +161,12 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
     });
 }
 
+fn random_place_name(culture: CultureId, world: &World) -> String {
+    let mut name = String::new();
+
+    name
+}
+
 pub fn create_test_world(world: &mut World) {
     let culture_id = world.storages.get_id::<Culture>();
     let religion_id = world.storages.get_id::<Religion>();
@@ -177,8 +183,8 @@ pub fn create_test_world(world: &mut World) {
         features: Vec::new(),
     });
     // create provinces
-    for i in 0..25 {
-        for j in 0..25 {
+    for i in 0..100 {
+        for j in 0..100 {
             let province_id = world.storages.get_id::<Province>();
             let coordinate = Coordinate::new(i - (j / 2), j);
             world.insert_province(Province {

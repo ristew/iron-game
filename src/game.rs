@@ -1,5 +1,5 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
-use ggez::{Context, GameError, event::EventHandler, graphics::{Color, clear, present}, timer};
+use ggez::{Context, GameError, event::EventHandler, graphics::{Color, Rect, clear, present, set_screen_coordinates}, timer};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
 use crate::*;
@@ -319,6 +319,7 @@ impl Factored for SettlementFeature {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SettlementLevel {
     Hamlet,
     Village,
@@ -513,23 +514,26 @@ pub trait IronData {
 pub struct MainState {
     world: World,
     ui_system: UiSystem,
+    render_context: RenderContext,
 }
 
 impl MainState {
     pub fn new(ctx: &mut Context) -> Self {
         let mut world: World = World::new(ctx);
         let mut ui_system = UiSystem::default();
+        let render_context = RenderContext::new(ctx);
 
         ui_system.init(ctx);
         create_test_world(&mut world);
         Self {
             world,
             ui_system,
+            render_context,
         }
     }
 }
 
-pub const FPS: f32 = 120.0;
+pub const FPS: f32 = 60.0;
 pub const FRAME_TIME: f32 = 1.0 / FPS;
 
 impl EventHandler<GameError> for MainState {
@@ -552,7 +556,7 @@ impl EventHandler<GameError> for MainState {
 
     fn draw(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
         clear(ctx, Color::BLACK);
-        render_world(&mut self.world, ctx);
+        self.render_context.render_world(&mut self.world, ctx);
         self.ui_system.run(ctx, &self.world);
         present(ctx).unwrap();
         timer::yield_now();
