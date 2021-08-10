@@ -3,6 +3,7 @@ use ggez::{Context, GameError, event::EventHandler, graphics::{Color, Rect, clea
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
 use crate::*;
+pub use GoodType::*;
 
 pub const TILE_SIZE_X: f32 = 16.0;
 pub const TILE_SIZE_Y: f32 = 16.0;
@@ -202,7 +203,6 @@ pub enum GoodType {
     Slaves, // ?? how to handle
 }
 
-pub use GoodType::*;
 
 #[derive(Debug, Copy, Clone)]
 pub enum FactorType {
@@ -215,19 +215,19 @@ pub enum FactorOp {
 }
 
 pub struct Factor {
-    amount: f64,
+    amount: f32,
     op: FactorOp,
 }
 
 impl Factor {
-    pub fn factor(amount: f64) -> Self {
+    pub fn factor(amount: f32) -> Self {
         Self {
             amount,
             op: FactorOp::Mul,
         }
     }
 
-    pub fn bonus(amount: f64) -> Self {
+    pub fn bonus(amount: f32) -> Self {
         Self {
             amount,
             op: FactorOp::Add,
@@ -235,7 +235,7 @@ impl Factor {
     }
 }
 
-pub fn apply_maybe_factors(base: f64, factors: Vec<Option<Factor>>) -> f64 {
+pub fn apply_maybe_factors(base: f32, factors: Vec<Option<Factor>>) -> f32 {
     let mut bonus = 0.0;
     let mut res = base;
     for factor_opt in factors.iter() {
@@ -265,16 +265,43 @@ lazy_static! {
     ];
 }
 
+pub enum ConsumableGoodCatagory {
+    Tier1,
+    Tier2,
+    Tier3,
+}
+
 impl GoodType {
     pub fn base_satiety(&self) -> Satiety {
         match *self {
-            Wheat => Satiety { base: 1.0, luxury: 0.1 },
-            Barley => Satiety { base: 1.0, luxury: 0.0 },
-            OliveOil => Satiety { base: 0.5, luxury: 0.5 },
-            Fish => Satiety { base: 0.8, luxury: 0.2 },
-            Wine => Satiety { base: 0.1, luxury: 1.0 },
-            Salt => Satiety { base: 0.3, luxury: 0.5 },
+            Wheat => Satiety { base: 3300.0, luxury: 0.1 },
+            Barley => Satiety { base: 3300.0, luxury: 0.0 },
+            OliveOil => Satiety { base: 8800.0, luxury: 0.3 },
+            Fish => Satiety { base: 1500.0, luxury: 0.2 },
+            Wine => Satiety { base: 500.0, luxury: 1.0 },
             _ => Satiety { base: 0.0, luxury: 0.0 },
+        }
+    }
+
+    pub fn max_consumed_monthly_per_capita(&self) -> f32 {
+        match *self {
+            Wheat => 22.5, // 3300 calories per kg at 2500 calories per day = 0.75 kg/day, I'm bad at math
+            Barley => 22.5,
+            OliveOil => 3.0,
+            Fish => 30.0, // a kg of fish a day, the life...
+            Wine => 10.0, // ~ half a bottle a day
+            _ => 0.0,
+        }
+    }
+
+    pub fn consumable_good_catagory(&self) -> Option<ConsumableGoodCatagory> {
+        match *self {
+            Wheat => Some(ConsumableGoodCatagory::Tier3),
+            Barley => Some(ConsumableGoodCatagory::Tier3),
+            OliveOil => Some(ConsumableGoodCatagory::Tier2),
+            Fish => Some(ConsumableGoodCatagory::Tier2),
+            Wine => Some(ConsumableGoodCatagory::Tier1),
+            _ => None,
         }
     }
 }
@@ -340,7 +367,7 @@ pub struct Settlement {
 }
 
 impl Settlement {
-    pub fn carrying_capacity(&self, world: &World) -> f64 {
+    pub fn carrying_capacity(&self, world: &World) -> f32 {
         let province_rc = self.province.get(world);
         let province = province_rc.borrow();
         let factor = FactorType::CarryingCapacity;
@@ -390,8 +417,8 @@ impl KidBuffer {
 
 #[derive(PartialEq)]
 pub struct Satiety {
-    pub base: f64,
-    pub luxury: f64,
+    pub base: f32,
+    pub luxury: f32,
 }
 
 impl std::ops::Add for Satiety {
@@ -414,7 +441,7 @@ impl std::ops::AddAssign for Satiety {
     }
 }
 
-impl std::ops::Mul<Satiety> for f64 {
+impl std::ops::Mul<Satiety> for f32 {
     type Output = Satiety;
 
     fn mul(self, rhs: Satiety) -> Self::Output {
@@ -425,14 +452,14 @@ impl std::ops::Mul<Satiety> for f64 {
     }
 }
 
-pub struct GoodStorage(pub HashMap<GoodType, f64>);
+pub struct GoodStorage(pub HashMap<GoodType, f32>);
 
 impl GoodStorage {
-    pub fn amount(&self, good: GoodType) -> f64 {
+    pub fn amount(&self, good: GoodType) -> f32 {
         *self.0.get(&good).unwrap_or(&0.0)
     }
 
-    pub fn consume(&mut self, good: GoodType, amount: f64) -> Option<f64> {
+    pub fn consume(&mut self, good: GoodType, amount: f32) -> Option<f32> {
         if let Some(mut stored) = self.0.get_mut(&good) {
             if *stored < amount {
                 let deficit = amount - *stored;
@@ -447,7 +474,7 @@ impl GoodStorage {
         }
     }
 
-    pub fn add(&mut self, good: GoodType, amount: f64) -> f64 {
+    pub fn add(&mut self, good: GoodType, amount: f32) -> f32 {
         if let Some(stored) = self.0.get_mut(&good) {
             *stored += amount;
             *stored
@@ -457,11 +484,11 @@ impl GoodStorage {
         }
     }
 
-    pub fn set(&mut self, good: GoodType, amount: f64) {
+    pub fn set(&mut self, good: GoodType, amount: f32) {
         self.0.insert(good, amount);
     }
 
-    // pub fn try_eat_diet(&self, diet: Diet) -> Vec<(GoodType, f64)> {
+    // pub fn try_eat_diet(&self, diet: Diet) -> Vec<(GoodType, f32)> {
     //     let mut bad_res = Vec::new();
 
     //     for part in diet.0.iter() {
@@ -521,10 +548,11 @@ impl MainState {
     pub fn new(ctx: &mut Context) -> Self {
         let mut world: World = World::new(ctx);
         let mut ui_system = UiSystem::default();
-        let render_context = RenderContext::new(ctx);
+        let mut render_context = RenderContext::new(ctx);
 
         ui_system.init(ctx);
         create_test_world(&mut world);
+        render_context.generate_province_meshes(&world, ctx);
         Self {
             world,
             ui_system,

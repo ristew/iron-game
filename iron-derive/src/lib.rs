@@ -24,6 +24,12 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
         impl Eq for #name_id {}
 
+        impl std::hash::Hash for #name_id {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                self.0.hash(state);
+            }
+        }
+
         impl std::fmt::Debug for #name_id {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str(format!("{}({})", #name_id_str, self.0).as_str())

@@ -35,7 +35,7 @@ pub fn harvest(pop: &PopId, world: &World) {
     let pop = pop_rc.borrow();
     // println!("harvest pop?");
     if let Some(farmed_good) = pop.farmed_good {
-        let mut farmed_amount = pop.size as f64;
+        let mut farmed_amount = pop.size as f32;
         let carrying_capacity = pop.settlement.get(world).borrow().carrying_capacity(world);
         if farmed_amount > carrying_capacity {
             farmed_amount = carrying_capacity + (farmed_amount - carrying_capacity).sqrt();

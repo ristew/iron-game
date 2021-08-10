@@ -1,13 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, FillOptions, Mesh, Rect, StrokeOptions, draw, present}};
+use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, FillOptions, Mesh, MeshBatch, Rect, StrokeOptions, Transform, draw, present}};
 
 use crate::*;
 
-#[derive(Clone)]
 pub struct RenderContext {
-    province_meshes: HashMap<usize, Mesh>,
-    hex_outline: Mesh,
+    province_meshes: HashSet<ProvinceId>,
+    mesh_map: MeshBatch,
+    outline_map: MeshBatch,
 }
 
 fn tile_sizes() -> (f32, f32) {
@@ -24,29 +24,38 @@ impl RenderContext {
             DrawMode::Stroke(StrokeOptions::default()),
             &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
             , Color::BLACK).unwrap();
-        Self {
-            province_meshes: HashMap::new(),
-            hex_outline,
-        }
-    }
-    fn generate_province_mesh(&mut self, province: &Province, ctx: &mut Context) {
-        let (w, h) = tile_sizes();
         let hex = Mesh::new_polygon(ctx, DrawMode::Fill(FillOptions::DEFAULT),
                                     &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
                                     , Color::GREEN).unwrap();
-        self.province_meshes.insert(province.id().num(), hex);
+        let mesh_map = MeshBatch::new(hex).unwrap();
+        let outline_map = MeshBatch::new(hex_outline).unwrap();
+        Self {
+            province_meshes: HashSet::new(),
+            mesh_map,
+            outline_map,
+        }
+    }
+    pub fn generate_province_meshes(&mut self, world: &World, ctx: &mut Context) {
+        for province in world.storages.get_storage::<Province>().rcs.iter().map(|rc| rc.borrow()) {
+            let mesh_key = province.id();
+            if !self.province_meshes.contains(&mesh_key) {
+                self.generate_province_mesh(&province, world, ctx);
+            }
+        }
+    }
+    fn generate_province_mesh(&mut self, province: &Province, world: &World, ctx: &mut Context) {
+        let (w, h) = tile_sizes();
+        let province_pixel_pos = province.coordinate.pixel_pos(&world.camera);
+        let hex_dest = [province_pixel_pos.x - w / 2.0, province_pixel_pos.y - h / 2.0];
+        self.mesh_map.add(DrawParam::new().dest(hex_dest));
+        self.outline_map.add(DrawParam::new().dest(hex_dest));
+        self.province_meshes.insert(province.id());
     }
     pub fn render_province(&mut self, province: &Province, world: &World, ctx: &mut Context) {
         let (w, h) = tile_sizes();
-        let mesh_key = province.id().num();
-        if !self.province_meshes.contains_key(&mesh_key) {
-            self.generate_province_mesh(province, ctx);
-        }
         let province_pixel_pos = province.coordinate.pixel_pos(&world.camera);
         let hex_dest = [province_pixel_pos.x - w / 2.0, province_pixel_pos.y - h / 2.0];
-        let hex = &self.province_meshes[&mesh_key];
-        draw(ctx, hex, DrawParam::new().dest(hex_dest)).unwrap();
-        draw(ctx, &self.hex_outline, DrawParam::new().dest(hex_dest)).unwrap();
+        // draw(ctx, &self.hex_outline, DrawParam::new().dest(hex_dest).transform(transform.to_bare_matrix())).unwrap();
         if Some(province.id()) == world.selected_province {
             let selected_line = Mesh::new_line(
                 ctx,
@@ -58,9 +67,15 @@ impl RenderContext {
     }
 
     pub fn render_world(&mut self, world: &mut World, ctx: &mut Context) {
-        for province in world.storages.get_storage::<Province>().rcs.iter().map(|rc| rc.borrow()) {
-            self.render_province(&province, world, ctx);
-        }
+        let transform = Transform::Values {
+            dest: [0.0, 0.0].into(),
+            rotation: 0.0,
+            scale: [1.0 / world.camera.zoom, 1.0 / world.camera.zoom].into(),
+            // scale: [world.camera.zoom, world.camera.zoom].into(),
+            offset: [-world.camera.p.x, -world.camera.p.y].into(),
+        };
+        self.mesh_map.draw(ctx, DrawParam::new().transform(transform.to_bare_matrix())).unwrap();
+        self.outline_map.draw(ctx, DrawParam::new().transform(transform.to_bare_matrix())).unwrap();
     }
 
     pub fn render_ui(&mut self, world: &World, ctx: &mut Context) {

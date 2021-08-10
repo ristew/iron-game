@@ -25,7 +25,7 @@ impl Command for PopGrowthCommand {
 
 pub struct AddGoodsCommand {
     pub good_type: GoodType,
-    pub amount: f64,
+    pub amount: f32,
     pub pop: PopId,
 }
 
@@ -40,7 +40,7 @@ impl Command for AddGoodsCommand {
 
 pub struct SetGoodsCommand {
     pub good_type: GoodType,
-    pub amount: f64,
+    pub amount: f32,
     pub pop: PopId,
 }
 
@@ -55,31 +55,43 @@ impl Command for SetGoodsCommand {
 
 pub struct PopEatCommand(pub PopId);
 
+/*
+ * challenge of matching available food to a consistent "diet" for a pop
+ * we define two kinds of satiety, base and luxury - base is not starving, luxury is living the good life
+ * pops with higher base
+ *
+ * fulfill ideally grains + meat/oil + luxuries
+ * t1 - wheat, barley?
+ *  - sustenance, survival
+ * t2 - sheep, Fish, olives
+ *  - relative comfort, health
+ * t3 - wine, salt
+ *  - enjoyment, luxury
+ *
+*/
 impl Command for PopEatCommand {
     fn run(&self, world: &mut World) {
-        let pop = world.get_ref::<Pop>(&self.0);
+        let pop = self.0.get(world);
         let mut total_satiety = Satiety {
             base: 0.0,
             luxury: 0.0,
         };
         let pop_size = pop.borrow().size;
-        let target_base = 23.0;
-        while total_satiety.base < target_base {
-            let mut added = 0.0;
-            for good in FOOD_GOODS.iter().rev() {
-                let mut amt = pop_size as f64;
-                if let Some(deficit) = pop.borrow_mut().owned_goods.consume(*good, amt) {
-                    amt -= deficit;
-                }
-                added += amt;
-                total_satiety = total_satiety + (amt / pop_size as f64) * pop.borrow().good_satiety(*good);
-
+        let target_base = 2500.0;
+        let consumed_good_order = [Wine, OliveOil, Fish, Wheat, Barley];
+        for good in consumed_good_order {
+            let good_owned_amount = pop.borrow().owned_goods.amount(good);
+            let mut consumed = (good_owned_amount / 3.0).min(good.max_consumed_monthly_per_capita() * pop.borrow().size as f32);
+            let mut whole_calories = total_satiety.base + consumed * pop.borrow().good_satiety(good).base;
+            if whole_calories > target_base {
+                consumed = consumed - (whole_calories - target_base) / pop.borrow().good_satiety(good).base;
+            }
+            if consumed > 0.01 {
+                pop.borrow_mut().owned_goods.consume(good, consumed);
+                total_satiety = total_satiety + (consumed / pop_size as f32) * pop.borrow().good_satiety(good);
                 if total_satiety.base > target_base {
                     break;
                 }
-            }
-            if added < 0.01 {
-                break;
             }
         }
 
@@ -100,6 +112,7 @@ pub struct MoveCameraCommand(pub Point2);
 impl Command for MoveCameraCommand {
     fn run(&self, world: &mut World) {
         world.camera.p += self.0;
+        // println!("world.camera.p {:?}", world.camera.p);
     }
 }
 
