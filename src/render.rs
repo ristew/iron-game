@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, FillOptions, Mesh, MeshBatch, Rect, StrokeOptions, Transform, draw, present}};
+use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, FillOptions, Mesh, MeshBatch, Rect, StrokeOptions, Transform, draw, present}, mint::{ColumnMatrix4}};
 
 use crate::*;
 
@@ -16,6 +16,15 @@ fn tile_sizes() -> (f32, f32) {
     (w, h)
 }
 
+fn hex_mesh(ctx: &mut Context, color: Color) -> Mesh {
+    let (w, h) = tile_sizes();
+    Mesh::new_polygon(
+        ctx,
+        DrawMode::Fill(FillOptions::DEFAULT),
+        &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]],
+        color).unwrap()
+}
+
 impl RenderContext {
     pub fn new(ctx: &mut Context) -> Self {
         let (w, h) = tile_sizes();
@@ -24,9 +33,7 @@ impl RenderContext {
             DrawMode::Stroke(StrokeOptions::default()),
             &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
             , Color::BLACK).unwrap();
-        let hex = Mesh::new_polygon(ctx, DrawMode::Fill(FillOptions::DEFAULT),
-                                    &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
-                                    , Color::GREEN).unwrap();
+        let hex = hex_mesh(ctx, Color::GREEN);
         let mesh_map = MeshBatch::new(hex).unwrap();
         let outline_map = MeshBatch::new(hex_outline).unwrap();
         Self {
@@ -51,31 +58,35 @@ impl RenderContext {
         self.outline_map.add(DrawParam::new().dest(hex_dest));
         self.province_meshes.insert(province.id());
     }
-    pub fn render_province(&mut self, province: &Province, world: &World, ctx: &mut Context) {
-        let (w, h) = tile_sizes();
-        let province_pixel_pos = province.coordinate.pixel_pos(&world.camera);
-        let hex_dest = [province_pixel_pos.x - w / 2.0, province_pixel_pos.y - h / 2.0];
-        // draw(ctx, &self.hex_outline, DrawParam::new().dest(hex_dest).transform(transform.to_bare_matrix())).unwrap();
-        if Some(province.id()) == world.selected_province {
-            let selected_line = Mesh::new_line(
-                ctx,
-                &[[w / 2.0, 0.0], [w / 2.0, 8.0 / world.camera.zoom]],
-                4.0 / world.camera.zoom,
-                Color::BLUE).unwrap();
-            draw(ctx, &selected_line, DrawParam::new().dest(hex_dest)).unwrap();
-        }
+
+    fn camera_matrix(&self, world: &World) -> ColumnMatrix4<f32> {
+        self.camera_matrix_dest(world, [0.0, 0.0])
     }
 
-    pub fn render_world(&mut self, world: &mut World, ctx: &mut Context) {
+    fn camera_matrix_dest<T>(&self, world: &World, dest: T) -> ColumnMatrix4<f32> where T: Into<ggez::mint::Point2<f32>> {
+        let dp = dest.into();
         let transform = Transform::Values {
-            dest: [0.0, 0.0].into(),
+            dest: [dp.x / world.camera.zoom, dp.y / world.camera.zoom].into(),
             rotation: 0.0,
             scale: [1.0 / world.camera.zoom, 1.0 / world.camera.zoom].into(),
             // scale: [world.camera.zoom, world.camera.zoom].into(),
             offset: [-world.camera.p.x, -world.camera.p.y].into(),
         };
-        self.mesh_map.draw(ctx, DrawParam::new().transform(transform.to_bare_matrix())).unwrap();
-        self.outline_map.draw(ctx, DrawParam::new().transform(transform.to_bare_matrix())).unwrap();
+        transform.to_bare_matrix()
+    }
+
+    pub fn render_world(&mut self, world: &mut World, ctx: &mut Context) {
+        let transform = self.camera_matrix(world);
+        self.mesh_map.draw(ctx, DrawParam::new().transform(transform)).unwrap();
+        self.outline_map.draw(ctx, DrawParam::new().transform(transform)).unwrap();
+        if let Some(province_id) = &world.selected_province {
+            let (w, h) = tile_sizes();
+            let selected_hex = hex_mesh(ctx, Color::new(0.0, 0.0, 0.0, 0.2));
+            let province_pixel_pos = province_id.get(world).borrow().coordinate.base_pixel_pos();
+            let hex_dest = [province_pixel_pos.x - w / 2.0, province_pixel_pos.y - h / 2.0];
+            let camera_matrix = self.camera_matrix_dest(world, hex_dest);
+            draw(ctx, &selected_hex, DrawParam::new().transform(camera_matrix)).unwrap();
+        }
     }
 
     pub fn render_ui(&mut self, world: &World, ctx: &mut Context) {

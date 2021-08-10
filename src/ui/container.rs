@@ -194,33 +194,3 @@ impl<T> Container for InfoContainer<T> where T: IronData {
     }
 }
 
-pub struct ProvinceInfoContainer {
-    pub province: ProvinceId,
-    pub mapping: Box::<dyn Fn(Rc<RefCell<Province>>) -> String>,
-    pub inner: TextContainer,
-}
-
-impl ProvinceInfoContainer {
-    pub fn new<T>(province: ProvinceId, mapping: T) -> Box<Self> where T: Fn(Rc<RefCell<Province>>) -> String + 'static {
-        Box::new(Self {
-            province,
-            mapping: Box::new(mapping),
-            inner: TextContainer::empty(),
-        })
-    }
-}
-
-impl Container for ProvinceInfoContainer {
-    fn size(&self) -> Point2 {
-        self.inner.size()
-    }
-
-    fn render(&self, ctx: &mut Context, dest: Point2) {
-        self.inner.render(ctx, dest)
-    }
-
-    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
-        self.inner.text = new_text((*self.mapping)(self.province.get(world)));
-        self.inner.layout(ctx, constraints, world)
-    }
-}

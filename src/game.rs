@@ -136,6 +136,7 @@ impl Iterator for CoordinateIter {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Terrain {
     Plains,
     Hills,
@@ -160,6 +161,7 @@ impl Factored for Terrain {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Climate {
     Tropical,
     Dry,
