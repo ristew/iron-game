@@ -563,7 +563,7 @@ impl MainState {
     }
 }
 
-pub const FPS: f32 = 60.0;
+pub const FPS: f32 = 120.0;
 pub const FRAME_TIME: f32 = 1.0 / FPS;
 
 impl EventHandler<GameError> for MainState {
@@ -601,6 +601,7 @@ impl EventHandler<GameError> for MainState {
         y: f32,
     ) {
         let point = Point2::new(x, y);
+        self.ui_system.mouse_click_tracker.click_buttons(x, y, &self.world);
         self.ui_system.events.add(Box::new(MouseButtonDownEvent(point)));
         if !self.ui_system.click_obscured(point) {
             self.world.events.add(Box::new(MouseButtonDownEvent(point)));

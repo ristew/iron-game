@@ -30,7 +30,7 @@ impl RenderContext {
         let (w, h) = tile_sizes();
         let hex_outline = Mesh::new_polygon(
             ctx,
-            DrawMode::Stroke(StrokeOptions::default()),
+            DrawMode::Stroke(StrokeOptions::default().with_line_width(2.0)),
             &[[w / 2.0, 0.0], [w, h / 4.0], [w, 3.0 * h / 4.0], [w / 2.0, h], [0.0, 3.0 * h / 4.0], [0.0, h / 4.0]]
             , Color::BLACK).unwrap();
         let hex = hex_mesh(ctx, Color::GREEN);

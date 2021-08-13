@@ -15,5 +15,6 @@ regex = "*"
 anymap = "0.12.1"
 ggez = "0.6.0"
 strum = { version = "0.21", features = ["derive"] }
+rayon = "1.5.1"
 
 [workspace]

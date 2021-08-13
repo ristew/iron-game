@@ -1,7 +1,7 @@
 pub mod container;
 pub mod events;
 
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use container::*;
 use events::*;
 use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text, draw}};
@@ -38,6 +38,25 @@ impl Constraints {
     }
 }
 
+struct Button {
+    bounds: Rect,
+    callback: Box::<dyn Fn(&World)>,
+    container: Weak<RefCell<dyn Container>>,
+}
+
+pub struct MouseClickTracker {
+    areas: Vec<Button>
+}
+
+impl MouseClickTracker {
+    pub fn click_buttons(&self, x: f32, y: f32, world: &World) {
+        for area in self.areas.iter() {
+            if area.bounds.contains([x, y]) {
+                (*area.callback)(world);
+            }
+        }
+    }
+}
 
 /**
  * UI Binding - a hell in your menus
@@ -62,6 +81,7 @@ impl Constraints {
 pub struct UiSystem {
     pub info_panel: BaseUiContainer,
     pub events: UiEvents,
+    pub mouse_click_tracker: MouseClickTracker,
 }
 
 impl UiSystem {
@@ -89,15 +109,14 @@ impl UiSystem {
         let window_w = window_size.0 / 3.5;
         let window_h = window_size.1;
         let mut info_panel = BaseUiContainer::new(Point2::new(5.0, 5.0), Color::new(0.9, 0.8, 0.7, 0.9), Constraints::new(window_w, window_h, window_w, window_h));
-        info_panel.add_child(Box::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0)))));
-        info_panel.add_child(Box::new(text_child));
-        info_panel.add_child(Box::new(text_child_2));
+        info_panel.add_child(Rc::new(RefCell::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0))))));
+        info_panel.add_child(Rc::new(RefCell::new(text_child)));
+        info_panel.add_child(Rc::new(RefCell::new(text_child_2)));
         self.info_panel = info_panel;
     }
 
     pub fn click_obscured(&self, point: Point2) -> bool {
         // println!("root_node layout_size {:?}", self.root_node.layout_size);
-        let mut obscured = true;
         point.x < self.info_panel.size().x && point.y < self.info_panel.size().y
     }
 }
@@ -114,6 +133,9 @@ impl Default for UiSystem {
         Self {
             info_panel,
             events: UiEvents::default(),
+            mouse_click_tracker: MouseClickTracker {
+                areas: Default::default(),
+            }
         }
     }
 }

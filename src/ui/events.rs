@@ -31,11 +31,11 @@ pub trait UiCommand {
 
 pub struct ShowProvinceInfo(pub ProvinceId);
 
-fn province_coordinate(id: ProvinceId) -> Box<InfoContainer<Province>> {
+fn province_coordinate(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
     InfoContainer::<Province>::new(id.clone(), |province, _| format!("{:?}", province.borrow().coordinate))
 }
 
-fn province_population(id: ProvinceId) -> Box<InfoContainer<Province>> {
+fn province_population(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
     InfoContainer::<Province>::new(id.clone(), |province, w| format!("{:?}", province.borrow().population(w)))
 }
 
@@ -45,11 +45,12 @@ macro_rules! infotainer {
     };
 }
 
+
 impl UiCommand for ShowProvinceInfo {
     fn run(&self, world: &World, ui_system: &mut UiSystem) {
         let province = self.0.get(world);
         ui_system.info_panel.clear();
-        ui_system.info_panel.add_child(Box::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0)))));
+        ui_system.info_panel.add_child(Rc::new(RefCell::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0))))));
         ui_system.info_panel.add_child(province_coordinate(self.0.clone()));
         ui_system.info_panel.add_child(province_population(self.0.clone()));
         for settlement_id in province.borrow().settlements.iter() {

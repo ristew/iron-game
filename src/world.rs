@@ -2,6 +2,7 @@ use std::{any::TypeId, cell::{Ref, RefCell}, collections::HashMap, fmt::Debug, h
 
 use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, Rect, StrokeOptions}};
 use anymap::AnyMap;
+use rayon::prelude::*;
 
 use crate::*;
 

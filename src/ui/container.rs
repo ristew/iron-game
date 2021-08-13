@@ -2,7 +2,8 @@ use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Font,
 
 use crate::*;
 
-pub type ContainerChildren = Vec<Box<dyn Container>>;
+pub struct ContainerId(usize);
+pub type ContainerChildren = Vec<Rc<RefCell<dyn Container>>>;
 
 pub trait Container {
     fn size(&self) -> Point2;
@@ -31,8 +32,8 @@ impl Container for BaseUiContainer {
         draw(ctx, &rect, DrawParam::default()).unwrap();
         let mut base_dest = dest;
         for child in self.children.iter() {
-            child.render(ctx, base_dest + self.padding);
-            base_dest.y += child.size().y;
+            child.borrow().render(ctx, base_dest + self.padding);
+            base_dest.y += child.borrow().size().y;
         }
     }
 
@@ -44,9 +45,9 @@ impl Container for BaseUiContainer {
         let constraints = self.constraints.reconcile(parent_constraints);
         // println!("constraints: {:?}", constraints);
         self.layout_size = Point2::new(constraints.min_width, constraints.min_height);
-        for child in self.children.iter_mut() {
-            child.layout(ctx, constraints, world);
-            let child_size = child.size();
+        for child in self.children.iter() {
+            child.borrow_mut().layout(ctx, constraints, world);
+            let child_size = child.borrow().size();
             self.layout_size.y += child_size.y;
             if child_size.x > self.layout_size.x {
                 self.layout_size.x = child_size.x.max(constraints.max_width);
@@ -56,7 +57,7 @@ impl Container for BaseUiContainer {
 }
 
 impl BaseUiContainer {
-    pub fn add_child(&mut self, child: Box<dyn Container>) -> &mut Self {
+    pub fn add_child(&mut self, child: Rc<RefCell<dyn Container>>) -> &mut Self {
         self.children.push(child);
         self
     }
@@ -162,20 +163,20 @@ pub struct InfoContainer<T> where T: IronData {
 }
 
 impl<T> InfoContainer<T> where T: IronData {
-    pub fn new<F>(id: T::IdType, mapping: F) -> Box<Self> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
-        Box::new(Self {
+    pub fn new<F>(id: T::IdType, mapping: F) -> Rc<RefCell<Self>> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
+        Rc::new(RefCell::new(Self {
             id,
             mapping: Box::new(mapping),
             inner: TextContainer::empty(),
-        })
+        }))
     }
 
-    pub fn new_world<F>(id: T::IdType, mapping: F) -> Box<Self> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
-        Box::new(Self {
+    pub fn new_world<F>(id: T::IdType, mapping: F) -> Rc<RefCell<Self>> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
+        Rc::new(RefCell::new(Self {
             id,
             mapping: Box::new(mapping),
             inner: TextContainer::empty(),
-        })
+        }))
     }
 }
 

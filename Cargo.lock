@@ -1098,6 +1098,7 @@ dependencies = [
  "lazy_static",
  "rand 0.8.4",
  "rand_distr",
+ "rayon",
  "regex",
  "strum",
 ]

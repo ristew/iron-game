@@ -2,7 +2,10 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::sync::{Arc, Mutex};
 use std::{fmt::Debug, hash::Hash, rc::{Rc, Weak}, any::TypeId};
+use rayon::iter::IntoParallelIterator;
+use rayon::vec::IntoIter;
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::*;
@@ -44,6 +47,19 @@ pub trait Storage {
     fn get_ref(&self, id: &Self::Id) -> Rc<RefCell<Self::Object>>;
     fn remove(&mut self, id: &Self::Id);
 }
+
+// pub struct InnerStorage<T>(Vec<Arc<T>>);
+
+// impl<T> IntoParallelIterator for InnerStorage<T> where T: Send + std::marker::Sync {
+//     type Iter = IntoIter<Arc<T>>;
+
+//     type Item = Arc<T>;
+
+//     fn into_par_iter(self) -> Self::Iter {
+//         IntoIter { vec: self.0 }
+//     }
+// }
+
 
 pub struct ObjectStorage<T, Id> where T: IronData {
     id_ctr: usize,
