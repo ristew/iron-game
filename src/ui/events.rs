@@ -32,36 +32,34 @@ pub trait UiCommand {
 pub struct ShowProvinceInfo(pub ProvinceId);
 
 fn province_coordinate(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
-    InfoContainer::<Province>::new(id.clone(), |province, _| format!("{:?}", province.borrow().coordinate))
+    id.info_container(|province, _| format!("{:?}", province.borrow().coordinate))
+
 }
 
 fn province_population(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
-    InfoContainer::<Province>::new(id.clone(), |province, w| format!("{:?}", province.borrow().population(w)))
+    id.info_container(|province, w| format!("{:?}", province.borrow().population(w)))
 }
 
 macro_rules! infotainer {
-    ( $type:ident, $id:expr, $path:expr ) => {
-        InfoContainer::<$type>::new($id.clone(), |data, _| format!("{}", data.borrow().$path))
+    ( $id:expr, $path:tt ) => {
+        $id.info_container(|data, _| format!("{}", data.borrow().$path))
     };
 }
+
+
 
 
 impl UiCommand for ShowProvinceInfo {
     fn run(&self, world: &World, ui_system: &mut UiSystem) {
         let province = self.0.get(world);
         ui_system.info_panel.clear();
-        ui_system.info_panel.add_child(Rc::new(RefCell::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0))))));
+        ui_system.info_panel.add_child(DateContainer::new());
         ui_system.info_panel.add_child(province_coordinate(self.0.clone()));
         ui_system.info_panel.add_child(province_population(self.0.clone()));
         for settlement_id in province.borrow().settlements.iter() {
+            ui_system.info_panel.add_child(infotainer!(settlement_id, name));
             ui_system.info_panel.add_child(
-                InfoContainer::<Settlement>::new(settlement_id.clone(), |settlement, _| format!("{}", settlement.borrow().name))
-            );
-            ui_system.info_panel.add_child(
-                InfoContainer::<Settlement>::new(
-                    settlement_id.clone(),
-                    |settlement, w| format!("{:?} of {}", settlement.borrow().level, settlement.borrow().population(w))
-                )
+                settlement_id.info_container(|settlement, w| format!("{:?} of {}", settlement.borrow().level, settlement.borrow().population(w)))
             );
         }
     }

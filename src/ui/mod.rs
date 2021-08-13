@@ -3,6 +3,7 @@ pub mod events;
 
 use std::rc::{Rc, Weak};
 use container::*;
+pub use container::InfoContainer;
 use events::*;
 use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text, draw}};
 
@@ -38,9 +39,13 @@ impl Constraints {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+struct ButtonId(usize);
+
 struct Button {
+    id: ButtonId,
     bounds: Rect,
-    callback: Box::<dyn Fn(&World)>,
+    callback: Box::<dyn Fn(&World, &Self)>,
     container: Weak<RefCell<dyn Container>>,
 }
 
@@ -52,9 +57,13 @@ impl MouseClickTracker {
     pub fn click_buttons(&self, x: f32, y: f32, world: &World) {
         for area in self.areas.iter() {
             if area.bounds.contains([x, y]) {
-                (*area.callback)(world);
+                (*area.callback)(world, &area);
             }
         }
+    }
+
+    fn remove_button(&mut self, button_id: ButtonId) -> Option<Button> {
+        self.areas.drain_filter(|button| button.id == button_id).next()
     }
 }
 

@@ -524,12 +524,15 @@ impl Hash for TechLevel {
 
 
 pub trait IronId {
-    type Target: IronData<IdType = Self>;
+    type Target: IronData<IdType = Self> + Sized;
     fn try_borrow(&self) -> Option<Rc<RefCell<Self::Target>>>;
     fn set_reference(&self, reference: Rc<RefCell<Self::Target>>);
     fn new(id: usize) -> Self;
     fn num(&self) -> usize;
     fn get(&self, world: &World) -> Rc<RefCell<Self::Target>>;
+    fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>> where F: Fn(Rc<RefCell<Self::Target>>, &World) -> String + 'static, Self: Sized + Clone {
+        InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
+    }
 }
 
 

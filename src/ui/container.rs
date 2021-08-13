@@ -62,6 +62,10 @@ impl BaseUiContainer {
         self
     }
 
+    pub fn add_children(&mut self, children: Vec<Rc<RefCell<dyn Container>>>) -> &mut Self {
+        self
+    }
+
     pub fn clear(&mut self) -> &mut Self {
         self.children.clear();
         self
@@ -156,6 +160,12 @@ impl Container for DateContainer {
     }
 }
 
+impl DateContainer {
+    pub fn new() -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0)))))
+    }
+}
+
 pub struct InfoContainer<T> where T: IronData {
     pub id: T::IdType,
     pub mapping: Box::<dyn Fn(Rc<RefCell<T>>, &World) -> String>,
@@ -163,10 +173,10 @@ pub struct InfoContainer<T> where T: IronData {
 }
 
 impl<T> InfoContainer<T> where T: IronData {
-    pub fn new<F>(id: T::IdType, mapping: F) -> Rc<RefCell<Self>> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
+    pub fn new<F>(id: T::IdType, mapping: Box<F>) -> Rc<RefCell<Self>> where F: Fn(Rc<RefCell<T>>, &World) -> String + 'static {
         Rc::new(RefCell::new(Self {
             id,
-            mapping: Box::new(mapping),
+            mapping,
             inner: TextContainer::empty(),
         }))
     }
