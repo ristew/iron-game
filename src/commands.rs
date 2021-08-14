@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::{HashMap, VecDeque}, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
 
 use crate::*;
 
@@ -33,7 +37,9 @@ impl Command for AddGoodsCommand {
     fn run(&self, world: &mut World) {
         // println!("add goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
         let pop = world.get_ref::<Pop>(&self.pop);
-        pop.borrow_mut().owned_goods.add(self.good_type, self.amount);
+        pop.borrow_mut()
+            .owned_goods
+            .add(self.good_type, self.amount);
         // println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
     }
 }
@@ -49,7 +55,9 @@ impl Command for SetGoodsCommand {
         // println!("set goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
         let pop = world.get_ref::<Pop>(&self.pop);
         // println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
-        pop.borrow_mut().owned_goods.set(self.good_type, self.amount);
+        pop.borrow_mut()
+            .owned_goods
+            .set(self.good_type, self.amount);
     }
 }
 
@@ -81,14 +89,18 @@ impl Command for PopEatCommand {
         let consumed_good_order = [Wine, OliveOil, Fish, Wheat, Barley];
         for good in consumed_good_order {
             let good_owned_amount = pop.borrow().owned_goods.amount(good);
-            let mut consumed = (good_owned_amount / 3.0).min(good.max_consumed_monthly_per_capita() * pop.borrow().size as f32);
-            let mut whole_calories = total_satiety.base + consumed * pop.borrow().good_satiety(good).base;
+            let mut consumed = (good_owned_amount / 3.0)
+                .min(good.max_consumed_monthly_per_capita() * pop.borrow().size as f32);
+            let mut whole_calories =
+                total_satiety.base + consumed * pop.borrow().good_satiety(good).base;
             if whole_calories > target_base {
-                consumed = consumed - (whole_calories - target_base) / pop.borrow().good_satiety(good).base;
+                consumed = consumed
+                    - (whole_calories - target_base) / pop.borrow().good_satiety(good).base;
             }
             if consumed > 0.01 {
                 pop.borrow_mut().owned_goods.consume(good, consumed);
-                total_satiety = total_satiety + (consumed / pop_size as f32) * pop.borrow().good_satiety(good);
+                total_satiety =
+                    total_satiety + (consumed / pop_size as f32) * pop.borrow().good_satiety(good);
                 if total_satiety.base > target_base {
                     break;
                 }
@@ -99,7 +111,8 @@ impl Command for PopEatCommand {
             pop.borrow_mut().kid_buffer.starve();
             if pop.borrow().satiety.base < 10.0 {
                 pop.borrow_mut().kid_buffer.starve();
-                pop.borrow_mut().die(positive_isample(1 + pop_size / 40, 2 + pop_size / 20))
+                pop.borrow_mut()
+                    .die(positive_isample(1 + pop_size / 40, 2 + pop_size / 20))
             }
         }
 

@@ -1,8 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
 use crate::*;
 use container::*;
 use ggez::graphics::Color;
-
+use std::{cell::RefCell, rc::Rc};
 
 pub struct UiEvents {
     pub events: Rc<RefCell<Vec<Box<dyn UiEvent>>>>,
@@ -32,7 +31,6 @@ pub trait UiCommand {
 
 fn province_coordinate(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
     id.info_container(|province, _| format!("{:?}", province.borrow().coordinate))
-
 }
 
 fn province_population(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
@@ -46,12 +44,22 @@ macro_rules! infotainer {
 }
 
 fn pop_info(pop_id: &PopId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
-    let info_list = BaseUiContainer::new_rc(Point2::new(4.0, 4.0), Color::new(0.0, 0.0, 0.0, 0.2), Constraints::new(0.0, 0.0, 999.9, 999.9));
+    let info_list = BaseUiContainer::new_rc(
+        Point2::new(4.0, 4.0),
+        Color::new(0.0, 0.0, 0.0, 0.2),
+        Constraints::new(0.0, 0.0, 999.9, 999.9),
+    );
     let button_id = ui_system.get_button_id();
 
-    info_list.borrow_mut().add_children(vec![
-        pop_id.info_container(|pop, w| format!("{} of {}", pop.borrow().size, pop.borrow().culture.get(w).borrow().name)),
-    ]);
+    info_list
+        .borrow_mut()
+        .add_children(vec![pop_id.info_container(|pop, w| {
+            format!(
+                "{} of {}",
+                pop.borrow().size,
+                pop.borrow().culture.get(w).borrow().name
+            )
+        })]);
 
     let button_container = ButtonUiContainer::new_rc(info_list, button_id);
     // ui_system.add_button(Button::new(button_id, button_container.clone(), |world, sys| {
@@ -60,10 +68,20 @@ fn pop_info(pop_id: &PopId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
     button_container
 }
 
-fn pop_list(settlement: SettlementId, world: &World, ui_system: &mut UiSystem) -> BaseUiContainerPtr {
-    let pop_list = BaseUiContainer::new_rc(Point2::new(4.0, 4.0), Color::new(0.0, 0.0, 0.0, 0.2), Constraints::new(0.0, 0.0, 999.9, 999.9));
+fn pop_list(
+    settlement: SettlementId,
+    world: &World,
+    ui_system: &mut UiSystem,
+) -> BaseUiContainerPtr {
+    let pop_list = BaseUiContainer::new_rc(
+        Point2::new(4.0, 4.0),
+        Color::new(0.0, 0.0, 0.0, 0.2),
+        Constraints::new(0.0, 0.0, 999.9, 999.9),
+    );
     for pop_id in settlement.get(world).borrow().pops.iter() {
-        pop_list.borrow_mut().add_child(pop_info(&pop_id, ui_system));
+        pop_list
+            .borrow_mut()
+            .add_child(pop_info(&pop_id, ui_system));
     }
     pop_list
 }
@@ -84,26 +102,53 @@ impl UiCommand for ShowSettlementInfo {
 }
 
 fn settlement_info(settlement_id: &SettlementId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
-    let info_list = BaseUiContainer::new_rc(Point2::new(4.0, 4.0), Color::new(0.0, 0.0, 0.0, 0.2), Constraints::new(0.0, 0.0, 999.9, 999.9));
+    let info_list = BaseUiContainer::new_rc(
+        Point2::new(4.0, 4.0),
+        Color::new(0.0, 0.0, 0.0, 0.2),
+        Constraints::new(0.0, 0.0, 999.9, 999.9),
+    );
     let button_id = ui_system.get_button_id();
 
     info_list.borrow_mut().add_children(vec![
         infotainer!(settlement_id, name),
-        settlement_id.info_container(|settlement, w| format!("{:?} of {}", settlement.borrow().level, settlement.borrow().population(w))),
+        settlement_id.info_container(|settlement, w| {
+            format!(
+                "{:?} of {}",
+                settlement.borrow().level,
+                settlement.borrow().population(w)
+            )
+        }),
     ]);
 
     let button_container = ButtonUiContainer::new_rc(info_list, button_id);
     let set_id = settlement_id.num();
-    ui_system.add_button(Button::new(button_id, button_container.clone(), move |world, sys| {
-        sys.events.add(Box::new(CommandEvent(Rc::new(ShowSettlementInfo(SettlementId::new(set_id))))));
-    }));
+    ui_system.add_button(Button::new(
+        button_id,
+        button_container.clone(),
+        move |world, sys| {
+            sys.events
+                .add(Box::new(CommandEvent(Rc::new(ShowSettlementInfo(
+                    SettlementId::new(set_id),
+                )))));
+        },
+    ));
     button_container
 }
 
-fn settlement_list(province: ProvinceId, world: &World, ui_system: &mut UiSystem) -> BaseUiContainerPtr {
-    let settlement_list = BaseUiContainer::new_rc(Point2::new(4.0, 4.0), Color::new(0.0, 0.0, 0.0, 0.2), Constraints::new(0.0, 0.0, 999.9, 999.9));
+fn settlement_list(
+    province: ProvinceId,
+    world: &World,
+    ui_system: &mut UiSystem,
+) -> BaseUiContainerPtr {
+    let settlement_list = BaseUiContainer::new_rc(
+        Point2::new(4.0, 4.0),
+        Color::new(0.0, 0.0, 0.0, 0.2),
+        Constraints::new(0.0, 0.0, 999.9, 999.9),
+    );
     for settlement_id in province.get(world).borrow().settlements.iter() {
-        settlement_list.borrow_mut().add_child(settlement_info(&settlement_id, ui_system));
+        settlement_list
+            .borrow_mut()
+            .add_child(settlement_info(&settlement_id, ui_system));
     }
     settlement_list
 }

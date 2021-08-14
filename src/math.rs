@@ -16,16 +16,16 @@ impl From<ggez::mint::Point2<f32>> for Point2 {
 
 impl Into<ggez::mint::Point2<f32>> for Point2 {
     fn into(self) -> ggez::mint::Point2<f32> {
-        ggez::mint::Point2 { x: self.x, y: self.y }
+        ggez::mint::Point2 {
+            x: self.x,
+            y: self.y,
+        }
     }
 }
 
 impl Point2 {
     pub fn new(x: f32, y: f32) -> Self {
-        Self {
-            x,
-            y,
-        }
+        Self { x, y }
     }
 
     pub fn zero(&self) -> bool {

@@ -91,8 +91,6 @@ impl Event for KeyDownEvent {
     fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
         None
     }
-
-
 }
 
 pub struct KeyUpEvent {
@@ -109,7 +107,6 @@ impl Event for KeyUpEvent {
         None
     }
 }
-
 
 pub struct KeyHeldEvent {
     pub keycode: ggez::event::KeyCode,

@@ -1,8 +1,8 @@
 extern crate proc_macro;
 
 use crate::proc_macro::TokenStream;
-use quote::{ quote, format_ident };
-use syn::{ parse_macro_input, DeriveInput };
+use quote::{format_ident, quote};
+use syn::{parse_macro_input, DeriveInput};
 
 #[proc_macro_attribute]
 pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {

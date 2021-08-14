@@ -1,8 +1,22 @@
-use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
-use ggez::{Context, GameError, event::{EventHandler, KeyCode}, graphics::{Color, Rect, clear, present, set_screen_coordinates}, timer};
+use crate::*;
+use ggez::{
+    event::{EventHandler, KeyCode},
+    graphics::{clear, present, set_screen_coordinates, Color, Rect},
+    timer, Context, GameError,
+};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
-use crate::*;
+use std::{
+    cell::{RefCell, RefMut},
+    collections::{HashMap, VecDeque},
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    ops::Deref,
+    rc::{Rc, Weak},
+    thread::{sleep, sleep_ms},
+    time::Duration,
+};
 pub use GoodType::*;
 
 pub const TILE_SIZE_X: f32 = 16.0;
@@ -39,7 +53,10 @@ impl Coordinate {
         let tile_x = TILE_SIZE_X;
         let tile_y = TILE_SIZE_Y;
         let p = camera.reverse_translate(point);
-        Self::from_cube_round((SQRT_3 / 3.0 * p.x - p.y / 3.0) / tile_x, (2.0 * p.y / 3.0) / tile_y)
+        Self::from_cube_round(
+            (SQRT_3 / 3.0 * p.x - p.y / 3.0) / tile_x,
+            (2.0 * p.y / 3.0) / tile_y,
+        )
     }
 
     pub fn from_cube_round(x: f32, y: f32) -> Self {
@@ -54,8 +71,8 @@ impl Coordinate {
             rx = -ry - rz;
         } else if ydiff > zdiff {
             ry = -rx - rz;
-        // } else {
-        //     rz = -rx - ry;
+            // } else {
+            //     rz = -rx - ry;
         }
         Self {
             x: rx as isize,
@@ -64,12 +81,8 @@ impl Coordinate {
     }
 
     pub fn new(x: isize, y: isize) -> Self {
-        Self {
-            x,
-            y
-        }
+        Self { x, y }
     }
-
 
     // pub fn from_window_pos(pos: Vec2, ) -> Self {
     //     Self::from_pixel_pos(pos)
@@ -77,14 +90,7 @@ impl Coordinate {
 
     pub fn neighbors(&self) -> Vec<Coordinate> {
         let mut ns = Vec::new();
-        let directions = vec![
-            (1, 0),
-            (1, -1),
-            (0, -1),
-            (-1, 0),
-            (-1, 1),
-            (0, 1)
-        ];
+        let directions = vec![(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
         for (dx, dy) in directions {
             ns.push(Coordinate {
                 x: self.x + dx,
@@ -118,7 +124,10 @@ impl Coordinate {
             let min = (-radius).max(-x - radius);
             let max = radius.min(-x + radius);
             for y in min..(max + 1) {
-                items.push(Coordinate { x: self.x + x, y: self.y + y });
+                items.push(Coordinate {
+                    x: self.x + x,
+                    y: self.y + y,
+                });
             }
         }
         items
@@ -211,7 +220,6 @@ pub enum GoodType {
     Slaves, // ?? how to handle
 }
 
-
 #[derive(Debug, Copy, Clone)]
 pub enum FactorType {
     CarryingCapacity,
@@ -263,14 +271,7 @@ pub trait Factored {
 }
 
 lazy_static! {
-    pub static ref FOOD_GOODS: Vec<GoodType> = vec![
-        Wheat,
-        Barley,
-        Fish,
-        OliveOil,
-        Salt,
-        Wine,
-    ];
+    pub static ref FOOD_GOODS: Vec<GoodType> = vec![Wheat, Barley, Fish, OliveOil, Salt, Wine,];
 }
 
 pub enum ConsumableGoodCatagory {
@@ -282,12 +283,30 @@ pub enum ConsumableGoodCatagory {
 impl GoodType {
     pub fn base_satiety(&self) -> Satiety {
         match *self {
-            Wheat => Satiety { base: 3300.0, luxury: 0.1 },
-            Barley => Satiety { base: 3300.0, luxury: 0.0 },
-            OliveOil => Satiety { base: 8800.0, luxury: 0.3 },
-            Fish => Satiety { base: 1500.0, luxury: 0.2 },
-            Wine => Satiety { base: 500.0, luxury: 1.0 },
-            _ => Satiety { base: 0.0, luxury: 0.0 },
+            Wheat => Satiety {
+                base: 3300.0,
+                luxury: 0.1,
+            },
+            Barley => Satiety {
+                base: 3300.0,
+                luxury: 0.0,
+            },
+            OliveOil => Satiety {
+                base: 8800.0,
+                luxury: 0.3,
+            },
+            Fish => Satiety {
+                base: 1500.0,
+                luxury: 0.2,
+            },
+            Wine => Satiety {
+                base: 500.0,
+                luxury: 1.0,
+            },
+            _ => Satiety {
+                base: 0.0,
+                luxury: 0.0,
+            },
         }
     }
 
@@ -349,7 +368,7 @@ impl Factored for SettlementFeature {
             FactorType::CarryingCapacity => match *self {
                 SettlementFeature::Riverside => Some(Factor::factor(1.2)),
                 _ => None,
-            }
+            },
         }
     }
 }
@@ -360,7 +379,7 @@ pub enum SettlementLevel {
     Village,
     Town,
     City,
-    Metropolis
+    Metropolis,
 }
 
 #[iron_data]
@@ -379,7 +398,10 @@ impl Settlement {
         let province_rc = self.province.get(world);
         let province = province_rc.borrow();
         let factor = FactorType::CarryingCapacity;
-        let mut factors = vec![province.terrain.factor(factor), province.climate.factor(factor)];
+        let mut factors = vec![
+            province.terrain.factor(factor),
+            province.climate.factor(factor),
+        ];
         factors.extend(self.features.iter().map(|f| f.factor(factor)));
         apply_maybe_factors(500.0, factors)
     }
@@ -528,7 +550,6 @@ impl Hash for TechLevel {
     }
 }
 
-
 pub trait IronId {
     type Target: IronData<IdType = Self> + Sized;
     fn try_borrow(&self) -> Option<Rc<RefCell<Self::Target>>>;
@@ -536,11 +557,14 @@ pub trait IronId {
     fn new(id: usize) -> Self;
     fn num(&self) -> usize;
     fn get(&self, world: &World) -> Rc<RefCell<Self::Target>>;
-    fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>> where F: Fn(Rc<RefCell<Self::Target>>, &World) -> String + 'static, Self: Sized + Clone {
+    fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
+    where
+        F: Fn(Rc<RefCell<Self::Target>>, &World) -> String + 'static,
+        Self: Sized + Clone,
+    {
         InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
     }
 }
-
 
 pub trait IronData {
     type DataType;
@@ -614,8 +638,12 @@ impl EventHandler<GameError> for MainState {
         y: f32,
     ) {
         let point = Point2::new(x, y);
-        self.ui_system.mouse_click_tracker.click_buttons(x, y, &self.world, &self.ui_system);
-        self.ui_system.events.add(Box::new(MouseButtonDownEvent(point)));
+        self.ui_system
+            .mouse_click_tracker
+            .click_buttons(x, y, &self.world, &self.ui_system);
+        self.ui_system
+            .events
+            .add(Box::new(MouseButtonDownEvent(point)));
         if !self.ui_system.click_obscured(point) {
             self.world.events.add(Box::new(MouseButtonDownEvent(point)));
         }
@@ -630,7 +658,15 @@ impl EventHandler<GameError> for MainState {
     ) {
     }
 
-    fn mouse_motion_event(&mut self, _ctx: &mut ggez::Context, _x: f32, _y: f32, _dx: f32, _dy: f32) {}
+    fn mouse_motion_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _x: f32,
+        _y: f32,
+        _dx: f32,
+        _dy: f32,
+    ) {
+    }
 
     fn mouse_enter_or_leave(&mut self, _ctx: &mut ggez::Context, _entered: bool) {}
 
@@ -651,8 +687,10 @@ impl EventHandler<GameError> for MainState {
             ggez::event::quit(ctx);
         } else {
             match keycode {
-                KeyCode::P => self.render_context.toggle_overlay(ctx, OverlayKind::Population),
-                _ => {},
+                KeyCode::P => self
+                    .render_context
+                    .toggle_overlay(ctx, OverlayKind::Population),
+                _ => {}
             };
             self.world.events.add(Box::new(KeyDownEvent {
                 keycode,
@@ -663,21 +701,43 @@ impl EventHandler<GameError> for MainState {
         }
     }
 
-    fn key_up_event(&mut self, _ctx: &mut ggez::Context, keycode: ggez::event::KeyCode, keymods: ggez::event::KeyMods) {
-        self.world.events.add(Box::new(KeyUpEvent {
-            keycode,
-            keymods,
-        }));
+    fn key_up_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        keycode: ggez::event::KeyCode,
+        keymods: ggez::event::KeyMods,
+    ) {
+        self.world
+            .events
+            .add(Box::new(KeyUpEvent { keycode, keymods }));
         self.world.events.set_key_up(keycode);
     }
 
     fn text_input_event(&mut self, _ctx: &mut ggez::Context, _character: char) {}
 
-    fn gamepad_button_down_event(&mut self, _ctx: &mut ggez::Context, _btn: ggez::event::Button, _id: ggez::event::GamepadId) {}
+    fn gamepad_button_down_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _btn: ggez::event::Button,
+        _id: ggez::event::GamepadId,
+    ) {
+    }
 
-    fn gamepad_button_up_event(&mut self, _ctx: &mut ggez::Context, _btn: ggez::event::Button, _id: ggez::event::GamepadId) {}
+    fn gamepad_button_up_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _btn: ggez::event::Button,
+        _id: ggez::event::GamepadId,
+    ) {
+    }
 
-    fn gamepad_axis_event(&mut self, _ctx: &mut ggez::Context, _axis: ggez::event::Axis, _value: f32, _id: ggez::event::GamepadId) {
+    fn gamepad_axis_event(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _axis: ggez::event::Axis,
+        _value: f32,
+        _id: ggez::event::GamepadId,
+    ) {
     }
 
     fn focus_event(&mut self, _ctx: &mut ggez::Context, _gained: bool) {}
@@ -689,9 +749,12 @@ impl EventHandler<GameError> for MainState {
 
     fn resize_event(&mut self, _ctx: &mut ggez::Context, _width: f32, _height: f32) {}
 
-    fn on_error(&mut self, _ctx: &mut ggez::Context, _origin: ggez::event::ErrorOrigin, _e: GameError) -> bool {
+    fn on_error(
+        &mut self,
+        _ctx: &mut ggez::Context,
+        _origin: ggez::event::ErrorOrigin,
+        _e: GameError,
+    ) -> bool {
         true
     }
-
-
 }

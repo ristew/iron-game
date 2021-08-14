@@ -1,11 +1,17 @@
 pub mod container;
 pub mod events;
 
-use std::{collections::HashMap, rc::{Rc, Weak}};
-use container::*;
 pub use container::InfoContainer;
+use container::*;
 use events::*;
-use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text, draw}};
+use ggez::{
+    graphics::{self, draw, Color, DrawMode, DrawParam, Drawable, Mesh, Rect, Text},
+    Context,
+};
+use std::{
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 use crate::*;
 
@@ -44,12 +50,15 @@ pub struct ButtonId(usize);
 
 pub struct Button {
     id: ButtonId,
-    callback: Box::<dyn Fn(&World, &UiSystem)>,
+    callback: Box<dyn Fn(&World, &UiSystem)>,
     container: Rc<RefCell<dyn Container>>,
 }
 
 impl Button {
-    fn new<T>(id: ButtonId, container: Rc<RefCell<dyn Container>>, callback: T) -> Self where T: Fn(&World, &UiSystem) + 'static {
+    fn new<T>(id: ButtonId, container: Rc<RefCell<dyn Container>>, callback: T) -> Self
+    where
+        T: Fn(&World, &UiSystem) + 'static,
+    {
         Self {
             id,
             callback: Box::new(callback),
@@ -75,9 +84,10 @@ impl MouseClickTracker {
     }
 
     fn remove_button(&mut self, button_id: ButtonId) -> Option<Button> {
-        self.areas.drain_filter(|button| button.id == button_id).next()
+        self.areas
+            .drain_filter(|button| button.id == button_id)
+            .next()
     }
-
 }
 
 /**
@@ -121,16 +131,18 @@ impl UiSystem {
             }
         }
         let window_size = graphics::size(ctx);
-        self.info_panel.layout(ctx, Constraints {
-            min_width: 0.0,
-            min_height: 0.0,
-            max_width: window_size.0,
-            max_height: window_size.1,
-        }, world);
+        self.info_panel.layout(
+            ctx,
+            Constraints {
+                min_width: 0.0,
+                min_height: 0.0,
+                max_width: window_size.0,
+                max_height: window_size.1,
+            },
+            world,
+        );
         self.info_panel.render(ctx, &self, Point2::new(0.0, 0.0));
-        for button in self.mouse_click_tracker.areas.iter() {
-
-        }
+        for button in self.mouse_click_tracker.areas.iter() {}
     }
 
     pub fn add_button(&mut self, button: Button) {
@@ -143,8 +155,15 @@ impl UiSystem {
         let window_size = graphics::size(ctx);
         let window_w = window_size.0 / 3.5;
         let window_h = window_size.1;
-        let mut info_panel = BaseUiContainer::new(Point2::new(5.0, 5.0), Color::new(0.9, 0.8, 0.7, 0.9), Constraints::new(window_w, window_h, window_w, window_h));
-        info_panel.add_child(Rc::new(RefCell::new(DateContainer(TextContainer::new("", Point2::new(1.0, 1.0))))));
+        let mut info_panel = BaseUiContainer::new(
+            Point2::new(5.0, 5.0),
+            Color::new(0.9, 0.8, 0.7, 0.9),
+            Constraints::new(window_w, window_h, window_w, window_h),
+        );
+        info_panel.add_child(Rc::new(RefCell::new(DateContainer(TextContainer::new(
+            "",
+            Point2::new(1.0, 1.0),
+        )))));
         info_panel.add_child(Rc::new(RefCell::new(text_child)));
         info_panel.add_child(Rc::new(RefCell::new(text_child_2)));
         self.info_panel = info_panel;
@@ -172,7 +191,7 @@ impl Default for UiSystem {
             mouse_click_tracker: MouseClickTracker {
                 areas: Default::default(),
                 button_bounds: RefCell::new(HashMap::new()),
-            }
+            },
         }
     }
 }

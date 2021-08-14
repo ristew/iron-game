@@ -1,15 +1,26 @@
-use std::{any::TypeId, cell::{Ref, RefCell}, collections::HashMap, fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc};
+use std::{
+    any::TypeId,
+    cell::{Ref, RefCell},
+    collections::HashMap,
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    rc::Rc,
+};
 
-use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, Rect, StrokeOptions}};
 use anymap::AnyMap;
-use rand::{Rng, thread_rng};
+use ggez::{
+    graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, Rect, StrokeOptions},
+    Context,
+};
+use rand::{thread_rng, Rng};
 use rand_distr::{Standard, Uniform};
 use rayon::prelude::*;
 
 use crate::*;
 
 pub struct Date {
-    pub day: usize
+    pub day: usize,
 }
 
 impl Date {
@@ -36,7 +47,6 @@ impl Date {
 
 pub fn parse_path(path: &'static str) {
     let path_regex = r"((self\.)?\w+)\.(.*)";
-
 }
 
 macro_rules! object {
@@ -66,7 +76,6 @@ impl World {
         self.commands.borrow_mut().push(command);
     }
 
-
     pub fn process_command_queue(&mut self) {
         let commands = self.commands.replace(Vec::new());
         for command in commands {
@@ -85,7 +94,8 @@ impl World {
     }
 
     pub fn insert_province(&mut self, province: Province) {
-        self.province_coord_map.insert(province.coordinate, province.id.clone());
+        self.province_coord_map
+            .insert(province.coordinate, province.id.clone());
         self.insert::<Province>(province);
     }
 
@@ -94,11 +104,19 @@ impl World {
     }
 
     pub fn insert_settlement(&mut self, settlement: Settlement) {
-        settlement.province.get(self).borrow_mut().settlements.push(settlement.id.clone());
+        settlement
+            .province
+            .get(self)
+            .borrow_mut()
+            .settlements
+            .push(settlement.id.clone());
         self.insert::<Settlement>(settlement);
     }
 
-    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>> where T: IronData + 'static {
+    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>>
+    where
+        T: IronData + 'static,
+    {
         self.storages.get_ref::<T>(id)
     }
 
@@ -108,7 +126,10 @@ impl World {
 
     // }
 
-    pub fn insert<T>(&mut self, data: T) -> T::IdType where T: IronData + 'static {
+    pub fn insert<T>(&mut self, data: T) -> T::IdType
+    where
+        T: IronData + 'static,
+    {
         // let id = self.storages.get
         self.storages.insert(data)
     }
@@ -151,7 +172,11 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
         owned_goods: GoodStorage(HashMap::new()),
     });
 
-    world.get_ref::<Pop>(&pop).borrow_mut().owned_goods.add(Wheat, 30000.0);
+    world
+        .get_ref::<Pop>(&pop)
+        .borrow_mut()
+        .owned_goods
+        .add(Wheat, 30000.0);
 
     world.insert_settlement(Settlement {
         id: settlement_id.clone(),
@@ -205,7 +230,6 @@ pub fn create_test_world(world: &mut World) {
         }
     }
 }
-
 
 pub fn pops_yearly_growth(world: &World) {
     for pop_ref in world.storages.get_storage::<Pop>().id_map.values() {

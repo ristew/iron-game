@@ -1,32 +1,35 @@
 #![feature(drain_filter)]
 
-use ggez::{ContextBuilder, conf::{WindowMode, WindowSetup}, event};
+use ggez::{
+    conf::{WindowMode, WindowSetup},
+    event, ContextBuilder,
+};
 #[macro_use]
 extern crate iron_derive;
 
-pub mod game;
 pub mod commands;
-pub mod world;
-pub mod probability;
-pub mod storage;
-pub mod render;
-pub mod pops;
-pub mod math;
 pub mod events;
+pub mod game;
+pub mod math;
+pub mod pops;
+pub mod probability;
+pub mod render;
+pub mod storage;
 pub mod ui;
+pub mod world;
 
-pub use game::*;
 pub use commands::*;
-pub use world::*;
-pub use probability::*;
-pub use storage::*;
-pub use render::*;
-pub use pops::*;
-pub use math::*;
 pub use events::*;
-pub use ui::*;
-pub use std::rc::Rc;
+pub use game::*;
+pub use math::*;
+pub use pops::*;
+pub use probability::*;
+pub use render::*;
 pub use std::cell::RefCell;
+pub use std::rc::Rc;
+pub use storage::*;
+pub use ui::*;
+pub use world::*;
 
 fn main() {
     let cb = ContextBuilder::new("iron-age", "ristew")

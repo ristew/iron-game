@@ -1,11 +1,16 @@
+use rayon::iter::IntoParallelIterator;
+use rayon::vec::IntoIter;
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use std::{fmt::Debug, hash::Hash, rc::{Rc, Weak}, any::TypeId};
-use rayon::iter::IntoParallelIterator;
-use rayon::vec::IntoIter;
+use std::{
+    any::TypeId,
+    fmt::Debug,
+    hash::Hash,
+    rc::{Rc, Weak},
+};
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::*;
@@ -32,7 +37,7 @@ impl StorageType {
         } else if TypeId::of::<T>() == TypeId::of::<Settlement>() {
             Self::Settlement
         } else {
-            panic!("could not match Id type to storage, {}", stringify!{T});
+            panic!("could not match Id type to storage, {}", stringify! {T});
         }
     }
 }
@@ -41,7 +46,9 @@ pub trait Storage {
     type Object: IronData<IdType = Self::Id>;
     type Id: IronId<Target = Self::Object>;
 
-    fn new() -> Self where Self: Sized;
+    fn new() -> Self
+    where
+        Self: Sized;
     fn insert(&mut self, item: Self::Object) -> Self::Id;
     fn get_id(&mut self) -> Self::Id;
     fn get_ref(&self, id: &Self::Id) -> Rc<RefCell<Self::Object>>;
@@ -60,15 +67,21 @@ pub trait Storage {
 //     }
 // }
 
-
-pub struct ObjectStorage<T, Id> where T: IronData {
+pub struct ObjectStorage<T, Id>
+where
+    T: IronData,
+{
     id_ctr: usize,
     pub rcs: Vec<Rc<RefCell<T>>>,
     pub id_map: HashMap<usize, Weak<RefCell<T>>>,
     _fake: PhantomData<Id>,
 }
 
-impl<T, Id> ObjectStorage<T, Id> where T: IronData<IdType = Id>, Id: IronId<Target = T> {
+impl<T, Id> ObjectStorage<T, Id>
+where
+    T: IronData<IdType = Id>,
+    Id: IronId<Target = T>,
+{
     fn load_id(&self, id: &T::IdType) {
         let rc = self.id_map.get(&id.num()).unwrap().upgrade().unwrap();
         id.set_reference(rc.clone());
@@ -90,7 +103,11 @@ impl<T, Id> ObjectStorage<T, Id> where T: IronData<IdType = Id>, Id: IronId<Targ
     }
 }
 
-impl<T, Id> Storage for ObjectStorage<T, Id> where T: IronData<IdType = Id>, Id: IronId<Target = T> + Debug {
+impl<T, Id> Storage for ObjectStorage<T, Id>
+where
+    T: IronData<IdType = Id>,
+    Id: IronId<Target = T> + Debug,
+{
     type Object = T;
     type Id = Id;
 
@@ -100,7 +117,8 @@ impl<T, Id> Storage for ObjectStorage<T, Id> where T: IronData<IdType = Id>, Id:
     fn insert(&mut self, item: Self::Object) -> Self::Id {
         let rc = Rc::new(RefCell::new(item));
         self.rcs.push(rc.clone());
-        self.id_map.insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
+        self.id_map
+            .insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
         let x = (*rc).borrow();
         x.id()
     }
@@ -110,10 +128,12 @@ impl<T, Id> Storage for ObjectStorage<T, Id> where T: IronData<IdType = Id>, Id:
         T::IdType::new(self.id_ctr)
     }
 
-
     fn remove(&mut self, id: &T::IdType) {
         self.id_map.remove(&id.num());
-        for removed in self.rcs.drain_filter(|item| item.borrow().id().num() == id.num()) {
+        for removed in self
+            .rcs
+            .drain_filter(|item| item.borrow().id().num() == id.num())
+        {
             println!("removed item: {:?}", removed.borrow().id());
         }
     }
@@ -123,7 +143,10 @@ impl<T, Id> Storage for ObjectStorage<T, Id> where T: IronData<IdType = Id>, Id:
     }
 }
 
-impl<T, Id> Default for ObjectStorage<T, Id> where T: IronData {
+impl<T, Id> Default for ObjectStorage<T, Id>
+where
+    T: IronData,
+{
     fn default() -> Self {
         Self {
             id_ctr: 0,
@@ -138,22 +161,43 @@ pub struct Storages {
     storages: HashMap<StorageType, Box<dyn Any>>,
 }
 
-
-
 impl Storages {
-    pub fn get_storage<T>(&self) -> &ObjectStorage<T, T::IdType> where T: IronData + 'static {
-        self.storages.get(&StorageType::match_type::<T>()).unwrap().downcast_ref::<ObjectStorage<T, T::IdType>>().unwrap()
+    pub fn get_storage<T>(&self) -> &ObjectStorage<T, T::IdType>
+    where
+        T: IronData + 'static,
+    {
+        self.storages
+            .get(&StorageType::match_type::<T>())
+            .unwrap()
+            .downcast_ref::<ObjectStorage<T, T::IdType>>()
+            .unwrap()
     }
-    pub fn get_storage_mut<T>(&mut self) -> &mut ObjectStorage<T, T::IdType> where T: IronData + 'static {
-        self.storages.get_mut(&StorageType::match_type::<T>()).unwrap().downcast_mut::<ObjectStorage<T, T::IdType>>().unwrap()
+    pub fn get_storage_mut<T>(&mut self) -> &mut ObjectStorage<T, T::IdType>
+    where
+        T: IronData + 'static,
+    {
+        self.storages
+            .get_mut(&StorageType::match_type::<T>())
+            .unwrap()
+            .downcast_mut::<ObjectStorage<T, T::IdType>>()
+            .unwrap()
     }
-    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>> where T: IronData + 'static {
+    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>>
+    where
+        T: IronData + 'static,
+    {
         self.get_storage::<T>().get_ref(id)
     }
-    pub fn insert<T>(&mut self, data: T) -> T::IdType where T: IronData + 'static {
+    pub fn insert<T>(&mut self, data: T) -> T::IdType
+    where
+        T: IronData + 'static,
+    {
         self.get_storage_mut::<T>().insert(data)
     }
-    pub fn get_id<T>(&mut self) -> T::IdType where T: IronData + 'static {
+    pub fn get_id<T>(&mut self) -> T::IdType
+    where
+        T: IronData + 'static,
+    {
         self.get_storage_mut::<T>().get_id()
     }
 }
@@ -161,13 +205,26 @@ impl Storages {
 impl Default for Storages {
     fn default() -> Self {
         let mut storages: HashMap<StorageType, Box<dyn Any>> = HashMap::new();
-        storages.insert(StorageType::Province, Box::new(ObjectStorage::<Province, ProvinceId>::new()));
-        storages.insert(StorageType::Pop, Box::new(ObjectStorage::<Pop, PopId>::new()));
-        storages.insert(StorageType::Settlement, Box::new(ObjectStorage::<Settlement, SettlementId>::new()));
-        storages.insert(StorageType::Culture, Box::new(ObjectStorage::<Culture, CultureId>::new()));
-        storages.insert(StorageType::Religion, Box::new(ObjectStorage::<Religion, ReligionId>::new()));
-        Self {
-            storages,
-        }
+        storages.insert(
+            StorageType::Province,
+            Box::new(ObjectStorage::<Province, ProvinceId>::new()),
+        );
+        storages.insert(
+            StorageType::Pop,
+            Box::new(ObjectStorage::<Pop, PopId>::new()),
+        );
+        storages.insert(
+            StorageType::Settlement,
+            Box::new(ObjectStorage::<Settlement, SettlementId>::new()),
+        );
+        storages.insert(
+            StorageType::Culture,
+            Box::new(ObjectStorage::<Culture, CultureId>::new()),
+        );
+        storages.insert(
+            StorageType::Religion,
+            Box::new(ObjectStorage::<Religion, ReligionId>::new()),
+        );
+        Self { storages }
     }
 }
