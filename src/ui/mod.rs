@@ -1,7 +1,7 @@
 pub mod container;
 pub mod events;
 
-use std::rc::{Rc, Weak};
+use std::{collections::HashMap, rc::{Rc, Weak}};
 use container::*;
 pub use container::InfoContainer;
 use events::*;
@@ -27,37 +27,49 @@ impl Constraints {
         }
     }
 
-    pub fn reconcile(&self, other: Constraints) -> Self {
+    pub fn reconcile(&self, other: Constraints, padding: Point2) -> Self {
         // println!("self: {:?}", self);
         // println!("other: {:?}", other);
         Self {
-            min_width: self.min_width.max(other.min_width),
-            min_height: self.min_height.max(other.min_height),
-            max_width: self.max_width.min(other.max_width),
-            max_height: self.max_height.min(other.max_height),
+            min_width: self.min_width.min(other.min_width),
+            min_height: self.min_height.min(other.min_height),
+            max_width: self.max_width.min(other.max_width) - padding.x * 2.0,
+            max_height: self.max_height.min(other.max_height) - padding.y * 2.0,
         }
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
-struct ButtonId(usize);
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
+pub struct ButtonId(usize);
 
-struct Button {
+pub struct Button {
     id: ButtonId,
-    bounds: Rect,
-    callback: Box::<dyn Fn(&World, &Self)>,
-    container: Weak<RefCell<dyn Container>>,
+    callback: Box::<dyn Fn(&World, &UiSystem)>,
+    container: Rc<RefCell<dyn Container>>,
+}
+
+impl Button {
+    fn new<T>(id: ButtonId, container: Rc<RefCell<dyn Container>>, callback: T) -> Self where T: Fn(&World, &UiSystem) + 'static {
+        Self {
+            id,
+            callback: Box::new(callback),
+            container,
+        }
+    }
 }
 
 pub struct MouseClickTracker {
-    areas: Vec<Button>
+    areas: Vec<Button>,
+    button_bounds: RefCell<HashMap<ButtonId, Rect>>,
 }
 
 impl MouseClickTracker {
-    pub fn click_buttons(&self, x: f32, y: f32, world: &World) {
+    pub fn click_buttons(&self, x: f32, y: f32, world: &World, ui_system: &UiSystem) {
         for area in self.areas.iter() {
-            if area.bounds.contains([x, y]) {
-                (*area.callback)(world, &area);
+            if let Some(bounds) = self.button_bounds.borrow().get(&area.id) {
+                if bounds.contains([x, y]) {
+                    (*area.callback)(world, ui_system);
+                }
             }
         }
     }
@@ -65,6 +77,7 @@ impl MouseClickTracker {
     fn remove_button(&mut self, button_id: ButtonId) -> Option<Button> {
         self.areas.drain_filter(|button| button.id == button_id).next()
     }
+
 }
 
 /**
@@ -91,9 +104,15 @@ pub struct UiSystem {
     pub info_panel: BaseUiContainer,
     pub events: UiEvents,
     pub mouse_click_tracker: MouseClickTracker,
+    button_id: usize,
 }
 
 impl UiSystem {
+    pub fn get_button_id(&mut self) -> ButtonId {
+        self.button_id += 1;
+        ButtonId(self.button_id)
+    }
+
     pub fn run(&mut self, ctx: &mut Context, world: &World) {
         let events = self.events.events.replace(Vec::new());
         for event in events {
@@ -108,7 +127,14 @@ impl UiSystem {
             max_width: window_size.0,
             max_height: window_size.1,
         }, world);
-        self.info_panel.render(ctx, Point2::new(0.0, 0.0));
+        self.info_panel.render(ctx, &self, Point2::new(0.0, 0.0));
+        for button in self.mouse_click_tracker.areas.iter() {
+
+        }
+    }
+
+    pub fn add_button(&mut self, button: Button) {
+        self.mouse_click_tracker.areas.push(button);
     }
 
     pub fn init(&mut self, ctx: &Context) {
@@ -140,10 +166,12 @@ impl Default for UiSystem {
             constraints: Constraints::new(0.0, 0.0, f32::INFINITY, f32::INFINITY),
         };
         Self {
+            button_id: 0,
             info_panel,
             events: UiEvents::default(),
             mouse_click_tracker: MouseClickTracker {
                 areas: Default::default(),
+                button_bounds: RefCell::new(HashMap::new()),
             }
         }
     }

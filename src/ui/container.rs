@@ -2,14 +2,18 @@ use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Drawable, Font,
 
 use crate::*;
 
+use super::events::UiCommand;
+
 pub struct ContainerId(usize);
 pub type ContainerChildren = Vec<Rc<RefCell<dyn Container>>>;
 
 pub trait Container {
     fn size(&self) -> Point2;
-    fn render(&self, ctx: &mut Context, dest: Point2);
+    fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>>;
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World);
 }
+
+pub type BaseUiContainerPtr = Rc<RefCell<BaseUiContainer>>;
 
 pub struct BaseUiContainer {
     pub children: ContainerChildren,
@@ -20,9 +24,9 @@ pub struct BaseUiContainer {
 }
 
 impl Container for BaseUiContainer {
-    fn render(&self, ctx: &mut Context, dest: Point2) {
+    fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>> {
         if self.layout_size.zero() {
-            return;
+            return Vec::new();
         }
         let rect = Mesh::new_rectangle(
             ctx,
@@ -32,9 +36,10 @@ impl Container for BaseUiContainer {
         draw(ctx, &rect, DrawParam::default()).unwrap();
         let mut base_dest = dest;
         for child in self.children.iter() {
-            child.borrow().render(ctx, base_dest + self.padding);
-            base_dest.y += child.borrow().size().y;
+            child.borrow().render(ctx, ui_system, base_dest + self.padding);
+            base_dest.y += child.borrow().size().y + self.padding.y;
         }
+        Vec::new()
     }
 
     fn size(&self) -> Point2 {
@@ -42,15 +47,15 @@ impl Container for BaseUiContainer {
     }
 
     fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints, world: &World) {
-        let constraints = self.constraints.reconcile(parent_constraints);
-        // println!("constraints: {:?}", constraints);
-        self.layout_size = Point2::new(constraints.min_width, constraints.min_height);
+        let constraints = self.constraints.reconcile(parent_constraints, self.padding);
+        println!("constraints: {:?}", constraints);
+        self.layout_size = Point2::new(self.constraints.min_width, self.constraints.min_height + self.padding.y);
         for child in self.children.iter() {
             child.borrow_mut().layout(ctx, constraints, world);
             let child_size = child.borrow().size();
-            self.layout_size.y += child_size.y;
+            self.layout_size.y += child_size.y + self.padding.y;
             if child_size.x > self.layout_size.x {
-                self.layout_size.x = child_size.x.max(constraints.max_width);
+                self.layout_size.x = child_size.x.max(constraints.max_width) + self.padding.x * 2.0;
             }
         }
     }
@@ -63,12 +68,21 @@ impl BaseUiContainer {
     }
 
     pub fn add_children(&mut self, children: Vec<Rc<RefCell<dyn Container>>>) -> &mut Self {
+
+        // TODO: change when compiler updates: for &child in children.iter() {
+        for child in children.iter() {
+            self.add_child(child.clone());
+        }
         self
     }
 
     pub fn clear(&mut self) -> &mut Self {
         self.children.clear();
         self
+    }
+
+    pub fn new_rc(padding: Point2, background_color: Color, constraints: Constraints) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::new(padding, background_color, constraints)))
     }
 
     pub fn new(padding: Point2, background_color: Color, constraints: Constraints) -> Self {
@@ -79,6 +93,39 @@ impl BaseUiContainer {
             background_color,
             constraints,
         }
+    }
+}
+
+pub type ButtonUiContainerPtr = Rc<RefCell<ButtonUiContainer>>;
+
+pub struct ButtonUiContainer {
+    inner: BaseUiContainerPtr,
+    button_id: ButtonId,
+}
+
+impl ButtonUiContainer {
+    pub fn new_rc(inner: BaseUiContainerPtr, button_id: ButtonId) -> ButtonUiContainerPtr {
+        Rc::new(RefCell::new(Self {
+            inner,
+            button_id,
+        }))
+    }
+}
+
+impl Container for ButtonUiContainer {
+    fn size(&self) -> Point2 {
+        self.inner.borrow().size()
+    }
+
+    fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>> {
+        let cmds = self.inner.borrow_mut().render(ctx, ui_system, dest);
+        let inner_size = self.inner.borrow().size();
+        ui_system.mouse_click_tracker.button_bounds.borrow_mut().insert(self.button_id, Rect::new(dest.x, dest.y, inner_size.x, inner_size.y));
+        cmds
+    }
+
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
+        self.inner.borrow_mut().layout(ctx, constraints, world);
     }
 }
 
@@ -93,11 +140,13 @@ impl Container for TextContainer {
         self.layout_size
     }
 
-    fn render(&self, ctx: &mut Context, dest: Point2) {
+    fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>> {
         self.text.draw(
             ctx,
             DrawParam::default().dest(dest + self.padding)
         ).unwrap();
+
+        Vec::new()
     }
 
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, _world: &World) {
@@ -150,8 +199,8 @@ impl Container for DateContainer {
         self.0.size()
     }
 
-    fn render(&self, ctx: &mut Context, dest: Point2) {
-        self.0.render(ctx, dest)
+    fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>> {
+        self.0.render(ctx, ui_system, dest)
     }
 
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
@@ -195,8 +244,8 @@ impl<T> Container for InfoContainer<T> where T: IronData {
         self.inner.size()
     }
 
-    fn render(&self, ctx: &mut Context, dest: Point2) {
-        self.inner.render(ctx, dest)
+    fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>> {
+        self.inner.render(ctx, ui_system, dest)
     }
 
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {

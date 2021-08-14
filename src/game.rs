@@ -14,6 +14,12 @@ pub struct Coordinate {
     pub y: isize,
 }
 
+impl std::fmt::Display for Coordinate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}, {}", self.x, self.y))
+    }
+}
+
 impl Coordinate {
     pub fn z(&self) -> isize {
         -self.x - self.y
@@ -604,7 +610,7 @@ impl EventHandler<GameError> for MainState {
         y: f32,
     ) {
         let point = Point2::new(x, y);
-        self.ui_system.mouse_click_tracker.click_buttons(x, y, &self.world);
+        self.ui_system.mouse_click_tracker.click_buttons(x, y, &self.world, &self.ui_system);
         self.ui_system.events.add(Box::new(MouseButtonDownEvent(point)));
         if !self.ui_system.click_obscured(point) {
             self.world.events.add(Box::new(MouseButtonDownEvent(point)));
