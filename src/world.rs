@@ -178,9 +178,10 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
         .owned_goods
         .add(Wheat, 30000.0);
 
+    let name = culture_id.get(world).borrow().language.get(world).borrow().generate_name();
     world.insert_settlement(Settlement {
         id: settlement_id.clone(),
-        name: "Test Town".to_owned(),
+        name,
         pops: vec![pop_id.clone()],
         features: Vec::new(),
         primary_culture: culture_id.clone(),
@@ -198,18 +199,24 @@ fn random_place_name(culture: CultureId, world: &World) -> String {
 pub fn create_test_world(world: &mut World) {
     let culture_id = world.storages.get_id::<Culture>();
     let religion_id = world.storages.get_id::<Religion>();
+    let language_id = world.storages.get_id::<Language>();
 
     world.insert(Religion {
         id: religion_id.clone(),
         name: "Test Religion".to_owned(),
     });
 
+    let mut language = Language::new(language_id.clone());
     world.insert(Culture {
         id: culture_id.clone(),
-        name: "Test People".to_owned(),
+        language: language_id.clone(),
+        name: language.generate_name(),
         religion: religion_id.clone(),
         features: Vec::new(),
     });
+    language.name = language.generate_name();
+    world.insert(language);
+
     // create provinces
     for i in 0..100 {
         for j in 0..100 {

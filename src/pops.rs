@@ -1,3 +1,7 @@
+use inflector::cases::titlecase::to_title_case;
+use rand::{Rng, distributions::Slice, thread_rng};
+use rand_distr::Uniform;
+
 use crate::*;
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
 
@@ -49,6 +53,81 @@ pub fn harvest(pop: &PopId, world: &World) {
     }
 }
 
+#[iron_data]
+pub struct Language {
+    pub id: LanguageId,
+    pub name: String,
+    pub vowels: Vec<String>,
+    pub initial_consonants: Vec<String>,
+    pub middle_consonants: Vec<String>,
+    pub end_consonants: Vec<String>,
+}
+
+fn list_filter_chance(list: &Vec<String>, chance: f32) -> Vec<String> {
+   list
+        .iter()
+        .filter_map(|v| if rand::random::<f32>() < chance { Some(v.clone()) } else { None })
+        .collect::<Vec<String>>()
+}
+
+fn map_string(list: Vec<&str>) -> Vec<String> {
+    list.iter().map(|v| String::from(*v)).collect::<Vec<String>>()
+}
+
+pub fn sample_list(list: &Vec<String>) -> String {
+    thread_rng().sample(Slice::new(list).unwrap()).clone()
+}
+
+impl Language {
+    pub fn new(id: LanguageId) -> Self {
+        let vowel_chance = 0.75;
+        let vowels = list_filter_chance(
+            &map_string(vec!["a", "ae", "e", "i", "ei", "u", "ue", "o", "oi", "au", "ou", "ee", "ea", "oa"]),
+            0.75);
+        let consonants = list_filter_chance(
+            &map_string(vec!["b", "d", "f", "g", "h", "j", "k", "l", "m", "n", "p", "r", "s", "t", "v", "w", "z", "ss", "sz", "ts", "th", "st"]),
+            0.75);
+
+        let initial_consonants = list_filter_chance(&consonants, 0.75);
+        let middle_consonants = list_filter_chance(&consonants, 0.75);
+        let end_consonants = list_filter_chance(&consonants, 0.75);
+
+        Self {
+            id,
+            name: "".to_owned(),
+            vowels,
+            initial_consonants,
+            middle_consonants,
+            end_consonants,
+
+        }
+    }
+
+
+    pub fn maybe_vowel(&self, chance: f32) -> Option<String> {
+        if rand::random::<f32>() < chance {
+            Some(sample_list(&self.vowels))
+        } else {
+            None
+        }
+    }
+
+    pub fn generate_name(&self) -> String {
+        let mut name: String = String::new();
+        name += &self.maybe_vowel(0.3).unwrap_or("".to_owned());
+        name += &sample_list(&self.initial_consonants);
+        for i in 0..thread_rng().sample(Uniform::new(0, 2)) {
+            name += &sample_list(&self.vowels);
+            name += &sample_list(&self.middle_consonants);
+        }
+        name += &sample_list(&self.vowels);
+        name += &sample_list(&self.end_consonants);
+        name += &self.maybe_vowel(0.3).unwrap_or("".to_owned());
+        to_title_case(name.as_str())
+    }
+}
+
+
 pub enum CultureFeature {
     Warrior,
     Seafaring,
@@ -59,6 +138,7 @@ pub struct Culture {
     pub id: CultureId,
     pub name: String,
     pub religion: ReligionId,
+    pub language: LanguageId,
     pub features: Vec<CultureFeature>,
 }
 

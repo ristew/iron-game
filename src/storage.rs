@@ -22,6 +22,7 @@ pub enum StorageType {
     Culture,
     Religion,
     Settlement,
+    Language,
 }
 
 impl StorageType {
@@ -36,6 +37,8 @@ impl StorageType {
             Self::Religion
         } else if TypeId::of::<T>() == TypeId::of::<Settlement>() {
             Self::Settlement
+        } else if TypeId::of::<T>() == TypeId::of::<Language>() {
+            Self::Language
         } else {
             panic!("could not match Id type to storage, {}", stringify! {T});
         }
@@ -224,6 +227,10 @@ impl Default for Storages {
         storages.insert(
             StorageType::Religion,
             Box::new(ObjectStorage::<Religion, ReligionId>::new()),
+        );
+        storages.insert(
+            StorageType::Language,
+            Box::new(ObjectStorage::<Language, LanguageId>::new()),
         );
         Self { storages }
     }

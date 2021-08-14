@@ -41,7 +41,7 @@ impl Overlay for PopOverlay {
     where
         Self: Sized,
     {
-        let hex = hex_mesh(ctx, Color::new(1.0, 1.0, 1.0, 0.5));
+        let hex = hex_mesh(ctx, Color::new(1.0, 1.0, 1.0, 1.0));
         Self {
             map: MeshBatch::new(hex).unwrap(),
         }
@@ -67,7 +67,7 @@ impl Overlay for PopOverlay {
             self.map.add(
                 DrawParam::new()
                     .dest(hex_dest)
-                    .color(Color::new(map_pct, map_pct, map_pct, 1.0)),
+                    .color(Color::new(map_pct, 0.0, 0.0, 0.7)),
             );
         }
     }
@@ -203,12 +203,12 @@ impl RenderContext {
         self.mesh_map
             .draw(ctx, DrawParam::new().transform(transform))
             .unwrap();
-        self.outline_map
-            .draw(ctx, DrawParam::new().transform(transform))
-            .unwrap();
         if let Some(overlay) = self.overlay.as_mut() {
             overlay.render(transform, ctx);
         }
+        self.outline_map
+            .draw(ctx, DrawParam::new().transform(transform))
+            .unwrap();
         if let Some(province_id) = &world.selected_province {
             let (w, h) = tile_sizes();
             let selected_hex = hex_mesh(ctx, Color::new(0.0, 0.0, 0.0, 0.2));
