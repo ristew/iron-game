@@ -2,6 +2,8 @@ use std::{any::TypeId, cell::{Ref, RefCell}, collections::HashMap, fmt::Debug, h
 
 use ggez::{Context, graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, Rect, StrokeOptions}};
 use anymap::AnyMap;
+use rand::{Rng, thread_rng};
+use rand_distr::{Standard, Uniform};
 use rayon::prelude::*;
 
 use crate::*;
@@ -197,7 +199,7 @@ pub fn create_test_world(world: &mut World) {
                 settlements: Vec::new(),
             });
 
-            for i in 0..3 {
+            for i in 0..thread_rng().sample(Uniform::new(0, 5)) {
                 add_test_settlement(world, culture_id.clone(), province_id.clone());
             }
         }

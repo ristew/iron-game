@@ -25,7 +25,7 @@ pub struct BaseUiContainer {
 
 impl Container for BaseUiContainer {
     fn render(&self, ctx: &mut Context, ui_system: &UiSystem, dest: Point2) -> Vec<Box<dyn UiCommand>> {
-        if self.layout_size.zero() {
+        if self.layout_size.x == 0.0 || self.layout_size.y == 0.0 {
             return Vec::new();
         }
         let rect = Mesh::new_rectangle(
@@ -48,7 +48,7 @@ impl Container for BaseUiContainer {
 
     fn layout(&mut self, ctx: &mut Context, parent_constraints: Constraints, world: &World) {
         let constraints = self.constraints.reconcile(parent_constraints, self.padding);
-        println!("constraints: {:?}", constraints);
+        // println!("constraints: {:?}", constraints);
         self.layout_size = Point2::new(self.constraints.min_width, self.constraints.min_height + self.padding.y);
         for child in self.children.iter() {
             child.borrow_mut().layout(ctx, constraints, world);
@@ -161,7 +161,7 @@ pub fn new_text(s: String) -> Text {
         text: s,
         color: Some(Color::BLACK),
         font: Some(Font::default()),
-        scale: Some(PxScale::from(10.0)),
+        scale: Some(PxScale::from(14.0)),
     })
 }
 

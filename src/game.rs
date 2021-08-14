@@ -1,5 +1,5 @@
 use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::Debug, hash::Hash, marker::PhantomData, ops::Deref, rc::{Rc, Weak}, thread::{sleep, sleep_ms}, time::Duration};
-use ggez::{Context, GameError, event::EventHandler, graphics::{Color, Rect, clear, present, set_screen_coordinates}, timer};
+use ggez::{Context, GameError, event::{EventHandler, KeyCode}, graphics::{Color, Rect, clear, present, set_screen_coordinates}, timer};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
 use crate::*;
@@ -583,6 +583,10 @@ impl EventHandler<GameError> for MainState {
         self.world.date.day += 1;
         day_tick(&self.world);
 
+        if let Some(overlay) = self.render_context.overlay.as_mut() {
+            overlay.update(&self.world);
+        }
+
         if self.world.date.is_month() {
             // println!("{:?}", self.world.date);
             // println!("{:?}", self.world.camera.p);
@@ -639,13 +643,17 @@ impl EventHandler<GameError> for MainState {
     fn key_down_event(
         &mut self,
         ctx: &mut ggez::Context,
-        keycode: ggez::event::KeyCode,
+        keycode: KeyCode,
         keymods: ggez::event::KeyMods,
         repeat: bool,
     ) {
         if keycode == ggez::event::KeyCode::Escape {
             ggez::event::quit(ctx);
         } else {
+            match keycode {
+                KeyCode::P => self.render_context.toggle_overlay(ctx, OverlayKind::Population),
+                _ => {},
+            };
             self.world.events.add(Box::new(KeyDownEvent {
                 keycode,
                 keymods,
