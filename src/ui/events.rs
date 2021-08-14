@@ -86,10 +86,10 @@ fn pop_list(
     pop_list
 }
 
-pub struct ShowSettlementInfo(pub SettlementId);
+pub struct SettlementInfoBuilder(SettlementId);
 
-impl UiCommand for ShowSettlementInfo {
-    fn run(&self, world: &World, ui_system: &mut UiSystem) {
+impl InfoPanelBuilder for SettlementInfoBuilder {
+    fn build(&self, world: &World, ui_system: &mut UiSystem) {
         let province = self.0.get(world);
         let pop_list = pop_list(self.0.clone(), world, ui_system);
         ui_system.info_panel.clear();
@@ -98,6 +98,14 @@ impl UiCommand for ShowSettlementInfo {
             infotainer!(self.0, name),
             pop_list,
         ]);
+    }
+}
+
+pub struct ShowSettlementInfo(pub SettlementId);
+
+impl UiCommand for ShowSettlementInfo {
+    fn run(&self, world: &World, ui_system: &mut UiSystem) {
+        ui_system.set_info_panel(SettlementInfoBuilder(self.0.clone()))
     }
 }
 
@@ -161,11 +169,11 @@ impl UiEvent for CommandEvent {
     }
 }
 
-pub struct ShowProvinceInfo(pub ProvinceId);
+struct ProvinceInfoBuilder(ProvinceId);
 
-impl UiCommand for ShowProvinceInfo {
-    fn run(&self, world: &World, ui_system: &mut UiSystem) {
-        let province = self.0.get(world);
+impl InfoPanelBuilder for ProvinceInfoBuilder {
+    fn build(&self, world: &World, ui_system: &mut UiSystem) {
+        ui_system.mouse_click_tracker.areas = Vec::new();
         let settlement_list = settlement_list(self.0.clone(), world, ui_system);
         ui_system.info_panel.clear();
         ui_system.info_panel.add_children(vec![
@@ -174,6 +182,14 @@ impl UiCommand for ShowProvinceInfo {
             province_population(self.0.clone()),
             settlement_list,
         ]);
+    }
+}
+
+pub struct ShowProvinceInfo(pub ProvinceId);
+
+impl UiCommand for ShowProvinceInfo {
+    fn run(&self, world: &World, ui_system: &mut UiSystem) {
+        ui_system.set_info_panel(ProvinceInfoBuilder(self.0.clone()));
     }
 }
 

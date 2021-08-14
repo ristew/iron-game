@@ -690,6 +690,9 @@ impl EventHandler<GameError> for MainState {
                 KeyCode::P => self
                     .render_context
                     .toggle_overlay(ctx, OverlayKind::Population),
+                KeyCode::Back => self
+                    .ui_system
+                    .info_panel_back(),
                 _ => {}
             };
             self.world.events.add(Box::new(KeyDownEvent {

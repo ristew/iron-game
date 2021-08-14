@@ -90,6 +90,10 @@ impl MouseClickTracker {
     }
 }
 
+pub trait InfoPanelBuilder {
+    fn build(&self, world: &World, ui_system: &mut UiSystem);
+}
+
 /**
  * UI Binding - a hell in your menus
  * 1. Direct binding - UI component references a game object, that is consulted every draw
@@ -115,6 +119,8 @@ pub struct UiSystem {
     pub events: UiEvents,
     pub mouse_click_tracker: MouseClickTracker,
     button_id: usize,
+    info_panel_builder_stack: Rc<RefCell<Vec<Box<dyn InfoPanelBuilder>>>>,
+    info_panel_changed: RefCell<bool>,
 }
 
 impl UiSystem {
@@ -141,8 +147,27 @@ impl UiSystem {
             },
             world,
         );
+        if *self.info_panel_changed.borrow() {
+            let info_panel_stack = self.info_panel_builder_stack.clone();
+            if info_panel_stack.borrow().len() == 0 {
+                // self.info_panel.clear();
+            } else {
+                info_panel_stack.borrow().last().unwrap().build(world, self);
+            }
+        }
+        *self.info_panel_changed.borrow_mut() = false;
         self.info_panel.render(ctx, &self, Point2::new(0.0, 0.0));
         for button in self.mouse_click_tracker.areas.iter() {}
+    }
+
+    pub fn set_info_panel<T>(&self, builder: T) where T: InfoPanelBuilder + 'static {
+        self.info_panel_builder_stack.borrow_mut().push(Box::new(builder));
+        *self.info_panel_changed.borrow_mut() = true;
+    }
+
+    pub fn info_panel_back(&self) {
+        self.info_panel_builder_stack.borrow_mut().pop();
+        *self.info_panel_changed.borrow_mut() = true;
     }
 
     pub fn add_button(&mut self, button: Button) {
@@ -192,6 +217,8 @@ impl Default for UiSystem {
                 areas: Default::default(),
                 button_bounds: RefCell::new(HashMap::new()),
             },
+            info_panel_builder_stack: Rc::new(RefCell::new(Vec::new())),
+            info_panel_changed: RefCell::new(false),
         }
     }
 }
