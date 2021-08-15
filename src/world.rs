@@ -153,89 +153,10 @@ impl World {
     }
 }
 
-fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId) {
-    let settlement_id = world.storages.get_id::<Settlement>();
-    let pop_id = world.storages.get_id::<Pop>();
-
-    let pop = world.insert(Pop {
-        id: pop_id.clone(),
-        size: 100,
-        farmed_good: Some(Wheat),
-        culture: culture_id.clone(),
-        settlement: settlement_id.clone(),
-        province: province_id.clone(),
-        satiety: Satiety {
-            base: 0.0,
-            luxury: 0.0,
-        },
-        kid_buffer: KidBuffer::new(),
-        owned_goods: GoodStorage(HashMap::new()),
-    });
-
-    world
-        .get_ref::<Pop>(&pop)
-        .borrow_mut()
-        .owned_goods
-        .add(Wheat, 30000.0);
-
-    let name = culture_id.get(world).borrow().language.get(world).borrow().generate_name();
-    world.insert_settlement(Settlement {
-        id: settlement_id.clone(),
-        name,
-        pops: vec![pop_id.clone()],
-        features: Vec::new(),
-        primary_culture: culture_id.clone(),
-        province: province_id.clone(),
-        level: SettlementLevel::Village,
-    });
-}
-
 fn random_place_name(culture: CultureId, world: &World) -> String {
     let mut name = String::new();
 
     name
-}
-
-pub fn create_test_world(world: &mut World) {
-    let culture_id = world.storages.get_id::<Culture>();
-    let religion_id = world.storages.get_id::<Religion>();
-    let language_id = world.storages.get_id::<Language>();
-
-    world.insert(Religion {
-        id: religion_id.clone(),
-        name: "Test Religion".to_owned(),
-    });
-
-    let mut language = Language::new(language_id.clone());
-    world.insert(Culture {
-        id: culture_id.clone(),
-        language: language_id.clone(),
-        name: language.generate_name(),
-        religion: religion_id.clone(),
-        features: Vec::new(),
-    });
-    language.name = language.generate_name();
-    world.insert(language);
-
-    // create provinces
-    for i in 0..100 {
-        for j in 0..100 {
-            let province_id = world.storages.get_id::<Province>();
-            let coordinate = Coordinate::new(i - (j / 2), j);
-            world.insert_province(Province {
-                id: province_id.clone(),
-                terrain: Terrain::Hills,
-                climate: Climate::Mild,
-                coordinate,
-                harvest_month: 8,
-                settlements: Vec::new(),
-            });
-
-            for i in 0..thread_rng().sample(Uniform::new(0, 5)) {
-                add_test_settlement(world, culture_id.clone(), province_id.clone());
-            }
-        }
-    }
 }
 
 pub fn pops_yearly_growth(world: &World) {

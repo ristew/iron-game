@@ -17,6 +17,7 @@ pub mod render;
 pub mod storage;
 pub mod ui;
 pub mod world;
+pub mod worldgen;
 
 pub use commands::*;
 pub use events::*;
@@ -30,6 +31,7 @@ pub use std::rc::Rc;
 pub use storage::*;
 pub use ui::*;
 pub use world::*;
+pub use worldgen::*;
 
 fn main() {
     let cb = ContextBuilder::new("iron-age", "ristew")

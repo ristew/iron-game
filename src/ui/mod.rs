@@ -157,11 +157,15 @@ impl UiSystem {
         }
         *self.info_panel_changed.borrow_mut() = false;
         self.info_panel.render(ctx, &self, Point2::new(0.0, 0.0));
-        for button in self.mouse_click_tracker.areas.iter() {}
     }
 
-    pub fn set_info_panel<T>(&self, builder: T) where T: InfoPanelBuilder + 'static {
-        self.info_panel_builder_stack.borrow_mut().push(Box::new(builder));
+    pub fn set_info_panel<T>(&self, builder: T)
+    where
+        T: InfoPanelBuilder + 'static,
+    {
+        self.info_panel_builder_stack
+            .borrow_mut()
+            .push(Box::new(builder));
         *self.info_panel_changed.borrow_mut() = true;
     }
 

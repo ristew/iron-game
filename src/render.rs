@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use ggez::{
     graphics::{
-        self, draw, present, Color, DrawMode, DrawParam, FillOptions, Mesh, MeshBatch, Rect,
-        StrokeOptions, Transform,
+        self, draw, present, BlendMode, Color, DrawMode, DrawParam, FillOptions, Mesh, MeshBatch,
+        Rect, StrokeOptions, Transform,
     },
     mint::ColumnMatrix4,
     Context,
@@ -26,6 +26,7 @@ pub trait Overlay {
     fn update(&mut self, world: &World);
     fn map(&mut self) -> &mut MeshBatch;
     fn render(&mut self, transform: ColumnMatrix4<f32>, ctx: &mut Context) {
+        self.map().set_blend_mode(Some(BlendMode::Alpha));
         self.map()
             .draw(ctx, DrawParam::new().transform(transform))
             .unwrap();
@@ -129,7 +130,7 @@ impl RenderContext {
             Color::BLACK,
         )
         .unwrap();
-        let hex = hex_mesh(ctx, Color::GREEN);
+        let hex = hex_mesh(ctx, Color::WHITE);
         let mesh_map = MeshBatch::new(hex).unwrap();
         let outline_map = MeshBatch::new(hex_outline).unwrap();
         Self {
@@ -141,10 +142,11 @@ impl RenderContext {
     }
 
     pub fn toggle_overlay(&mut self, ctx: &mut Context, kind: OverlayKind) {
-        println!("toggle overlay {:?}", kind);
+        // println!("toggle overlay {:?}", kind);
         if let Some(overlay) = &self.overlay {
             if overlay.kind() == kind {
                 self.overlay = None;
+                return;
             }
         }
 
@@ -174,7 +176,11 @@ impl RenderContext {
             province_pixel_pos.x - w / 2.0,
             province_pixel_pos.y - h / 2.0,
         ];
-        self.mesh_map.add(DrawParam::new().dest(hex_dest));
+        self.mesh_map.add(
+            DrawParam::new()
+                .dest(hex_dest)
+                .color(province.terrain.color()),
+        );
         self.outline_map.add(DrawParam::new().dest(hex_dest));
         self.province_meshes.insert(province.id());
     }

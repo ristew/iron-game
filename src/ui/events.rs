@@ -178,6 +178,7 @@ impl InfoPanelBuilder for ProvinceInfoBuilder {
         ui_system.info_panel.clear();
         ui_system.info_panel.add_children(vec![
             DateContainer::new(),
+            infotainer!(self.0, terrain),
             infotainer!(self.0, coordinate),
             province_population(self.0.clone()),
             settlement_list,

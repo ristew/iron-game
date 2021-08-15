@@ -9,7 +9,7 @@ use rand::{prelude::SliceRandom, thread_rng};
 use std::{
     cell::{RefCell, RefMut},
     collections::{HashMap, VecDeque},
-    fmt::Debug,
+    fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
     ops::Deref,
@@ -137,6 +137,11 @@ impl Coordinate {
             neighbors: self.neighbors_in_radius(radius),
         }
     }
+
+    pub fn dist(self, other: Self) -> isize {
+        return ((self.x - other.x).abs() + (self.y - other.y).abs() + (self.z() - other.z()).abs())
+            / 2;
+    }
 }
 
 pub struct CoordinateIter {
@@ -159,6 +164,13 @@ pub enum Terrain {
     Desert,
     Marsh,
     Forest,
+    Ocean,
+}
+
+impl Display for Terrain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("{:?}", self).as_str())
+    }
 }
 
 impl Factored for Terrain {
@@ -171,7 +183,22 @@ impl Factored for Terrain {
                 Terrain::Desert => Factor::factor(0.1),
                 Terrain::Marsh => Factor::factor(0.5),
                 Terrain::Forest => Factor::factor(0.5),
+                Terrain::Ocean => Factor::factor(0.0),
             }),
+        }
+    }
+}
+
+impl Terrain {
+    pub fn color(self) -> Color {
+        match self {
+            Terrain::Plains => Color::new(0.5, 0.9, 0.5, 1.0),
+            Terrain::Hills => Color::new(0.4, 0.7, 0.4, 1.0),
+            Terrain::Mountains => Color::new(0.5, 0.5, 0.3, 1.0),
+            Terrain::Desert => Color::new(1.0, 1.0, 0.8, 1.0),
+            Terrain::Marsh => Color::new(0.3, 0.6, 0.6, 1.0),
+            Terrain::Forest => Color::new(0.2, 0.7, 0.3, 1.0),
+            Terrain::Ocean => Color::new(0.1, 0.4, 0.7, 1.0),
         }
     }
 }
@@ -577,6 +604,8 @@ pub struct MainState {
     world: World,
     ui_system: UiSystem,
     render_context: RenderContext,
+    target_speed: isize,
+    frame: isize,
 }
 
 impl MainState {
@@ -592,6 +621,8 @@ impl MainState {
             world,
             ui_system,
             render_context,
+            target_speed: 32,
+            frame: 0,
         }
     }
 }
@@ -601,19 +632,25 @@ pub const FRAME_TIME: f32 = 1.0 / FPS;
 
 impl EventHandler<GameError> for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
+        self.frame += 1;
+
         if timer::delta(ctx).as_secs_f32() < FRAME_TIME {
             timer::sleep(Duration::from_secs_f32(FRAME_TIME) - timer::delta(ctx));
         }
-        self.world.date.day += 1;
-        day_tick(&self.world);
 
-        if let Some(overlay) = self.render_context.overlay.as_mut() {
-            overlay.update(&self.world);
-        }
+        if self.target_speed > 0 && self.frame % self.target_speed == 0 {
+            self.world.date.day += 1;
+            day_tick(&self.world);
 
-        if self.world.date.is_month() {
-            // println!("{:?}", self.world.date);
-            // println!("{:?}", self.world.camera.p);
+            if self.world.date.is_month() {
+                // println!("{:?}", self.world.date);
+                // println!("{:?}", self.world.camera.p);
+            }
+            if let Some(overlay) = self.render_context.overlay.as_mut() {
+                if self.world.date.is_month() || overlay.map().get_instance_params().len() == 0 {
+                    overlay.update(&self.world);
+                }
+            }
         }
         self.world.process_events();
         self.world.process_command_queue();
@@ -690,9 +727,10 @@ impl EventHandler<GameError> for MainState {
                 KeyCode::P => self
                     .render_context
                     .toggle_overlay(ctx, OverlayKind::Population),
-                KeyCode::Back => self
-                    .ui_system
-                    .info_panel_back(),
+                KeyCode::RBracket => self.target_speed = (self.target_speed / 2).max(1),
+                KeyCode::LBracket => self.target_speed = (self.target_speed * 2).min(256),
+                KeyCode::Space => self.target_speed = -self.target_speed,
+                KeyCode::Back => self.ui_system.info_panel_back(),
                 _ => {}
             };
             self.world.events.add(Box::new(KeyDownEvent {

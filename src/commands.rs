@@ -134,6 +134,5 @@ pub struct ZoomCameraCommand(pub f32);
 impl Command for ZoomCameraCommand {
     fn run(&self, world: &mut World) {
         world.camera.zoom = (world.camera.zoom + self.0).max(0.25).min(2.0);
-        println!("world.camera.zoom {}", world.camera.zoom);
     }
 }
