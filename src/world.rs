@@ -177,7 +177,7 @@ pub fn harvest_provinces(world: &World) {
     for province in world.storages.get_storage::<Province>().rcs.iter() {
         if world.date.month() == province.borrow().harvest_month {
             for settlement in province.borrow().settlements.iter() {
-                for pop in world.get_ref::<Settlement>(settlement).borrow().pops.iter() {
+                for pop in settlement.get(world).borrow().pops.iter() {
                     harvest(pop, world);
                 }
             }

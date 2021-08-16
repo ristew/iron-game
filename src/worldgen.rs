@@ -34,7 +34,6 @@ fn generate_height_map() -> HashMap<Coordinate, f32> {
             height_map.insert(coordinate, noise + basin_height);
         }
     }
-    println!("{:?}", height_map);
     height_map
 }
 
@@ -60,7 +59,6 @@ pub fn generate_world(world: &mut World) {
 
 pub fn create_test_world(world: &mut World) {
     generate_world(world);
-    return;
     let culture_id = world.storages.get_id::<Culture>();
     let religion_id = world.storages.get_id::<Religion>();
     let language_id = world.storages.get_id::<Language>();
@@ -84,16 +82,13 @@ pub fn create_test_world(world: &mut World) {
     // create provinces
     for i in 0..100 {
         for j in 0..100 {
-            let province_id = world.storages.get_id::<Province>();
             let coordinate = Coordinate::new(i - (j / 2), j);
-            world.insert_province(Province {
-                id: province_id.clone(),
-                terrain: Terrain::Hills,
-                climate: Climate::Mild,
-                coordinate,
-                harvest_month: 8,
-                settlements: Vec::new(),
-            });
+
+            let province_id = world.get_province_coordinate(coordinate).unwrap();
+
+            if province_id.get(world).borrow().terrain == Terrain::Ocean {
+                continue;
+            }
 
             for i in 0..thread_rng().sample(Uniform::new(0, 5)) {
                 add_test_settlement(world, culture_id.clone(), province_id.clone());

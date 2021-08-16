@@ -387,6 +387,9 @@ pub enum SettlementFeature {
     Oceanside,
     Harbor,
     Mines(GoodType),
+    Fertile,
+    DominantCrop(GoodType),
+    Infertile,
 }
 
 impl Factored for SettlementFeature {
@@ -457,17 +460,20 @@ impl KidBuffer {
         if self.0.len() > 12 {
             self.0.pop_back().unwrap()
         } else {
-            babies / 2
+            babies
         }
     }
 
-    pub fn starve(&mut self) {
+    pub fn starve(&mut self) -> isize {
         let cohort = sample(3.0).abs().min(12.0) as usize;
         if self.0.len() > cohort {
             let cohort_size = self.0[cohort];
             let dead_kids = positive_isample(cohort_size / 20 + 1, cohort_size / 10 + 1);
             // println!("cohort {}, size {}, dead {}", cohort, cohort_size, dead_kids);
-            self.0[cohort] = (cohort_size - dead_kids).max(0)
+            self.0[cohort] = (cohort_size - dead_kids).max(0);
+            cohort_size - self.0[cohort]
+        } else {
+            0
         }
     }
 }
@@ -542,7 +548,7 @@ impl GoodStorage {
     }
 
     pub fn set(&mut self, good: GoodType, amount: f32) {
-        self.0.insert(good, amount);
+        *self.0.get_mut(&good).unwrap() = amount;
     }
 
     // pub fn try_eat_diet(&self, diet: Diet) -> Vec<(GoodType, f32)> {
@@ -621,7 +627,7 @@ impl MainState {
             world,
             ui_system,
             render_context,
-            target_speed: 32,
+            target_speed: 1,
             frame: 0,
         }
     }

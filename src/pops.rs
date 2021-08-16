@@ -1,5 +1,5 @@
 use inflector::cases::titlecase::to_title_case;
-use rand::{distributions::Slice, thread_rng, Rng};
+use rand::{Rng, distributions::Slice, random, thread_rng};
 use rand_distr::Uniform;
 
 use crate::*;
@@ -23,13 +23,13 @@ impl Pop {
         good.base_satiety()
     }
 
-    pub fn die(&mut self, amount: isize) {
+    pub fn die(&mut self, amount: isize) -> isize {
         // println!("die pops: {}", amount);
+        let before = self.size;
         self.size = (self.size - amount).max(0);
+
         // println!("size: {}", self.size);
-        if self.size == 0 {
-            std::process::exit(0);
-        }
+        before - self.size
     }
 }
 
@@ -44,10 +44,13 @@ pub fn harvest(pop: &PopId, world: &World) {
         if farmed_amount > carrying_capacity {
             farmed_amount = carrying_capacity + (farmed_amount - carrying_capacity).sqrt();
         }
-        farmed_amount *= 350.0;
+        if random::<f32>() > 0.9 {
+            // println!("failed harvest! halving farmed goods");
+            farmed_amount *= 0.5;
+        }
         world.add_command(Box::new(SetGoodsCommand {
             good_type: farmed_good,
-            amount: farmed_amount,
+            amount: farmed_amount * 300.0,
             pop: pop.id.clone(),
         }));
     }

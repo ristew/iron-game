@@ -11,6 +11,7 @@ pub enum EventKind {
     KeyHeld,
     MouseWheel,
     MouseButtonDown,
+    PopStarve,
 }
 
 pub trait Event {
@@ -162,5 +163,22 @@ impl Event for MouseButtonDownEvent {
         } else {
             None
         }
+    }
+}
+
+pub struct PopStarveEvent {
+    pub pop: PopId,
+    pub amount: isize,
+    pub children: isize,
+}
+
+impl Event for PopStarveEvent {
+    fn kind(&self) -> EventKind {
+        EventKind::PopStarve
+    }
+
+    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+        println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
+        None
     }
 }

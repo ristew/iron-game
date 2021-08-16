@@ -53,7 +53,7 @@ pub struct SetGoodsCommand {
 impl Command for SetGoodsCommand {
     fn run(&self, world: &mut World) {
         // println!("set goods {:?} {} {:?}", self.good_type, self.amount, self.pop);
-        let pop = world.get_ref::<Pop>(&self.pop);
+        let pop = self.pop.get(world);
         // println!("owned {}", pop.borrow().owned_goods.amount(self.good_type));
         pop.borrow_mut()
             .owned_goods
@@ -89,14 +89,17 @@ impl Command for PopEatCommand {
         let consumed_good_order = [Wine, OliveOil, Fish, Wheat, Barley];
         for good in consumed_good_order {
             let good_owned_amount = pop.borrow().owned_goods.amount(good);
-            let mut consumed = (good_owned_amount / 3.0)
+            let mut consumed = (good_owned_amount / 2.0)
                 .min(good.max_consumed_monthly_per_capita() * pop.borrow().size as f32);
+            // println!("{:?}-{:?}: consumed {} good owned amounts {} target base {} for {}", self.0.clone(), good, consumed, good_owned_amount, target_base, pop_size);
             let mut whole_calories =
-                total_satiety.base + consumed * pop.borrow().good_satiety(good).base;
-            if whole_calories > target_base {
+                total_satiety.base + consumed * pop.borrow().good_satiety(good).base / pop_size as f32;
+            // println!("cal: {} goa: {}", whole_calories, good_owned_amount);
+            if whole_calories as f32 > target_base {
                 consumed = consumed
                     - (whole_calories - target_base) / pop.borrow().good_satiety(good).base;
             }
+            // println!("consumed: {}, whole calories: {}", consumed, whole_calories);
             if consumed > 0.01 {
                 pop.borrow_mut().owned_goods.consume(good, consumed);
                 total_satiety =
@@ -106,14 +109,24 @@ impl Command for PopEatCommand {
                 }
             }
         }
+        // println!("total_satiety base {}", total_satiety.base);
 
-        if total_satiety.base < 20.0 {
-            pop.borrow_mut().kid_buffer.starve();
-            if pop.borrow().satiety.base < 10.0 {
-                pop.borrow_mut().kid_buffer.starve();
-                pop.borrow_mut()
+        if total_satiety.base < target_base * 0.6 {
+            let mut dead_kids = 0;
+            let mut dead_adults = 0;
+            // println!("hungry! {}", total_satiety.base);
+            dead_kids += pop.borrow_mut().kid_buffer.starve();
+            if total_satiety.base < target_base * 0.3 {
+                dead_kids += pop.borrow_mut().kid_buffer.starve();
+                dead_adults += pop.borrow_mut()
                     .die(positive_isample(1 + pop_size / 40, 2 + pop_size / 20))
             }
+
+            world.events.add(Box::new(PopStarveEvent {
+                pop: self.0.clone(),
+                amount: dead_adults,
+                children: dead_kids,
+            }));
         }
 
         pop.borrow_mut().satiety = total_satiety;
