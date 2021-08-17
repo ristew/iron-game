@@ -90,7 +90,7 @@ pub fn create_test_world(world: &mut World) {
                 continue;
             }
 
-            for i in 0..thread_rng().sample(Uniform::new(0, 5)) {
+            for i in 0..thread_rng().sample(Uniform::new(0, 2)) {
                 add_test_settlement(world, culture_id.clone(), province_id.clone());
             }
         }
@@ -114,6 +114,7 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
         },
         kid_buffer: KidBuffer::new(),
         owned_goods: GoodStorage(HashMap::new()),
+        migration_status: None,
     });
 
     world

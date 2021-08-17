@@ -36,7 +36,8 @@ pub trait Event {
 
 pub struct Events {
     // pub event_command_mapper: EventCommandMapper, //
-    pub events: Rc<RefCell<Vec<Box<dyn Event>>>>,
+    pub events:RefCell<Vec<Box<dyn Event>>>,
+    pub deferred: RefCell<HashMap<usize, Vec<Box<dyn Event>>>>,
     pub down_keys: HashSet<KeyCode>,
 }
 
@@ -46,6 +47,7 @@ impl Default for Events {
             // event_command_mapper: Default::default(),
             events: Default::default(),
             down_keys: Default::default(),
+            deferred: Default::default(),
         }
     }
 }
@@ -53,6 +55,27 @@ impl Default for Events {
 impl Events {
     pub fn add(&self, event: Box<dyn Event>) {
         self.events.borrow_mut().push(event);
+    }
+
+    pub fn add_list(&self, events: Vec<Box<dyn Event>>) {
+        self.events.borrow_mut().extend(events.into_iter());
+    }
+
+    pub fn add_deferred(&self, event: Box<dyn Event>, date: usize) {
+        if let Some(events) = self.deferred.borrow_mut().get_mut(&date) {
+            events.push(event);
+        } else {
+            self.deferred.borrow_mut().insert(date, vec![event]);
+        }
+
+    }
+
+    pub fn get_deferred(&self, date: Date) -> Vec<Box<dyn Event>> {
+        if let Some(events) = self.deferred.borrow_mut().remove(&date.day) {
+            events
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn set_key_down(&mut self, key: KeyCode) {
@@ -73,7 +96,8 @@ impl Events {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&self, world: &World) {
+        self.add_list(self.get_deferred(world.date));
         self.spawn_held_events();
     }
 }
@@ -178,7 +202,10 @@ impl Event for PopStarveEvent {
     }
 
     fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
-        None
+        // println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
+        Some(Box::new(PopSeekMigrationCommand {
+            pop: self.pop.clone(),
+            starved: self.amount + self.children / 2,
+        }))
     }
 }

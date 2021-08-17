@@ -8,7 +8,7 @@ use ggez::{
 extern crate iron_derive;
 
 pub mod commands;
-pub mod events;
+pub mod game_events;
 pub mod game;
 pub mod math;
 pub mod pops;
@@ -20,7 +20,7 @@ pub mod world;
 pub mod worldgen;
 
 pub use commands::*;
-pub use events::*;
+pub use game_events::*;
 pub use game::*;
 pub use math::*;
 pub use pops::*;

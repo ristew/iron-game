@@ -31,6 +31,10 @@ pub fn individual_event(probability: f64) -> bool {
     random::<f64>() < probability
 }
 
+pub fn logistic(x: f64) -> f64 {
+    0.5 + 0.5 * (x / 2.0).tanh()
+}
+
 pub fn dev_mean_sample(stddev: f64, mean: f64) -> f64 {
     thread_rng().sample::<f64, StandardNormal>(StandardNormal) * stddev + mean
 }

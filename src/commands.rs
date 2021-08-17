@@ -4,6 +4,9 @@ use std::{
     rc::Rc,
 };
 
+use rand::{Rng, thread_rng};
+use rand_distr::Uniform;
+
 use crate::*;
 
 pub trait Command {
@@ -147,5 +150,47 @@ pub struct ZoomCameraCommand(pub f32);
 impl Command for ZoomCameraCommand {
     fn run(&self, world: &mut World) {
         world.camera.zoom = (world.camera.zoom + self.0).max(0.25).min(2.0);
+    }
+}
+
+pub struct PopSeekMigrationCommand {
+    pub pop: PopId,
+    pub starved: isize,
+}
+
+impl Command for PopSeekMigrationCommand {
+    fn run(&self, world: &mut World) {
+        let migration_desire = self.starved;
+        if migration_desire > 1 {
+            let this_province = self.pop.get(world).borrow().settlement.get(world).borrow().province.get(world);
+            let coordinate = this_province.borrow().coordinate;
+            let random_point = Coordinate::new(
+                coordinate.x + thread_rng().sample(Uniform::new(-5, 5)),
+                coordinate.y + thread_rng().sample(Uniform::new(-5, 5)),
+            );
+            if random_point == coordinate {
+                // got unlucky, just die
+                return;
+            }
+            if let Some(target_province_id) = world.get_province_coordinate(random_point) {
+                let target_province = target_province_id.get(world);
+                let mut target_value = target_province.borrow().base_living_target_value();
+
+                for settlement in target_province.borrow().settlements.iter() {
+                    if settlement.get(world).borrow().primary_culture != self.pop.get(world).borrow().culture {
+                        target_value -= 2.0;
+                    }
+                }
+                if individual_event(logistic(target_value)) {
+                    println!("migrate {:?} to {}", self.pop, random_point);
+                    let size = self.pop.get(world).borrow().size / 5;
+                    self.pop.get(world).borrow_mut().migration_status = Some(MigrationStatus {
+                        migrating: size,
+                        dest: target_province_id.clone(),
+                        date: world.date.day + 60,
+                    });
+                }
+            }
+        }
     }
 }

@@ -19,6 +19,7 @@ use rayon::prelude::*;
 
 use crate::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Date {
     pub day: usize,
 }
@@ -84,7 +85,7 @@ impl World {
     }
 
     pub fn process_events(&mut self) {
-        self.events.update();
+        self.events.update(self);
         let events = self.events.events.replace(Vec::new());
         for event in events {
             if let Some(command) = event.map_event(self) {

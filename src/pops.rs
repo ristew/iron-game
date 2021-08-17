@@ -5,6 +5,12 @@ use rand_distr::Uniform;
 use crate::*;
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
 
+pub struct MigrationStatus {
+    pub migrating: isize,
+    pub dest: ProvinceId,
+    pub date: usize,
+}
+
 #[iron_data]
 pub struct Pop {
     pub id: PopId,
@@ -16,6 +22,7 @@ pub struct Pop {
     pub owned_goods: GoodStorage,
     pub satiety: Satiety,
     pub farmed_good: Option<GoodType>,
+    pub migration_status: Option<MigrationStatus>,
 }
 
 impl Pop {

@@ -379,6 +379,27 @@ impl Province {
         }
         total_pop
     }
+
+    pub fn base_living_target_value(&self) -> f64 {
+        let mut total = 0.0;
+        total -= match self.terrain {
+            // TODO: depends on security condition
+            Terrain::Plains => 0.1,
+            Terrain::Hills => 0.0,
+            Terrain::Mountains => 1.0,
+            Terrain::Desert => 2.0,
+            Terrain::Marsh => 0.5,
+            Terrain::Forest => 0.5,
+            Terrain::Ocean => 999999.0,
+        };
+        total -= match self.climate {
+            Climate::Tropical => 0.3,
+            Climate::Dry => 0.3,
+            Climate::Mild => 0.0,
+            Climate::Cold => 0.3,
+        };
+        total
+    }
 }
 
 pub enum SettlementFeature {
