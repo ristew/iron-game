@@ -5,6 +5,7 @@ use rand_distr::Uniform;
 use crate::*;
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
 
+#[derive(Clone, Debug)]
 pub struct MigrationStatus {
     pub migrating: isize,
     pub dest: ProvinceId,

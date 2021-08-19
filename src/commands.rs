@@ -189,8 +189,24 @@ impl Command for PopSeekMigrationCommand {
                         dest: target_province_id.clone(),
                         date: world.date.day + 60,
                     });
+                    world.events.add_deferred(Box::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
                 }
             }
         }
+    }
+}
+
+pub struct PopMigrateCommand {
+    pub pop: PopId,
+    pub dest: ProvinceId,
+    pub migrating: isize,
+}
+
+impl Command for PopMigrateCommand {
+    fn run(&self, world: &mut World) {
+        println!("finally migrate {:?}", self.pop);
+        let orig_pop = self.pop.get(world);
+        add_settlement(world, orig_pop.borrow().culture.clone(), self.dest.clone(), self.migrating);
+        orig_pop.borrow_mut().size -= self.migrating;
     }
 }

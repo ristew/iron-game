@@ -12,6 +12,7 @@ pub enum EventKind {
     MouseWheel,
     MouseButtonDown,
     PopStarve,
+    MigrationDone,
 }
 
 pub trait Event {
@@ -62,8 +63,8 @@ impl Events {
     }
 
     pub fn add_deferred(&self, event: Box<dyn Event>, date: usize) {
-        if let Some(events) = self.deferred.borrow_mut().get_mut(&date) {
-            events.push(event);
+        if self.deferred.borrow().contains_key(&date) {
+            self.deferred.borrow_mut().get_mut(&date).unwrap().push(event);
         } else {
             self.deferred.borrow_mut().insert(date, vec![event]);
         }
@@ -206,6 +207,30 @@ impl Event for PopStarveEvent {
         Some(Box::new(PopSeekMigrationCommand {
             pop: self.pop.clone(),
             starved: self.amount + self.children / 2,
+        }))
+    }
+}
+
+pub struct MigrationDoneEvent(pub PopId);
+
+impl Event for MigrationDoneEvent {
+    fn kind(&self) -> EventKind {
+        EventKind::MigrationDone
+    }
+
+    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+        let pop_rc = self.0.get(world);
+        let pop = pop_rc.borrow();
+        let migration_status = pop.migration_status.as_ref()?;
+        if migration_status.date < world.date.day {
+            return None;
+        }
+
+
+        Some(Box::new(PopMigrateCommand {
+            pop: self.0.clone(),
+            dest: migration_status.dest.clone(),
+            migrating: migration_status.migrating.min(pop.size),
         }))
     }
 }

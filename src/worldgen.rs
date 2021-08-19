@@ -98,12 +98,15 @@ pub fn create_test_world(world: &mut World) {
 }
 
 fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId) {
+    add_settlement(world, culture_id, province_id, 100);
+}
+pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, size: isize) {
     let settlement_id = world.storages.get_id::<Settlement>();
     let pop_id = world.storages.get_id::<Pop>();
 
     let pop = world.insert(Pop {
         id: pop_id.clone(),
-        size: 100,
+        size,
         farmed_good: Some(Wheat),
         culture: culture_id.clone(),
         settlement: settlement_id.clone(),
@@ -121,7 +124,7 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
         .get_ref::<Pop>(&pop)
         .borrow_mut()
         .owned_goods
-        .add(Wheat, 30000.0);
+        .add(Wheat, size as f32 * 200.0);
 
     let name = culture_id
         .get(world)
