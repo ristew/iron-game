@@ -368,6 +368,7 @@ pub struct Province {
     pub climate: Climate,
     pub coordinate: Coordinate,
     pub harvest_month: usize,
+    pub controller: Option<PolityId>,
 }
 
 impl Province {
@@ -400,6 +401,23 @@ impl Province {
         };
         total
     }
+}
+
+pub enum PolityLevel {
+    Tribe,
+    Confederacy,
+    CityState,
+    Kingdom,
+    Republic,
+}
+
+#[iron_data]
+pub struct Polity {
+    pub id: PolityId,
+    pub name: String,
+    pub primary_culture: CultureId,
+    pub capital: SettlementId,
+    pub level: PolityLevel,
 }
 
 pub enum SettlementFeature {
@@ -442,6 +460,7 @@ pub struct Settlement {
     pub primary_culture: CultureId,
     pub province: ProvinceId,
     pub level: SettlementLevel,
+    pub controller: PolityId,
 }
 
 impl Settlement {

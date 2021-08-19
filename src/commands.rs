@@ -206,7 +206,7 @@ impl Command for PopMigrateCommand {
     fn run(&self, world: &mut World) {
         println!("finally migrate {:?}", self.pop);
         let orig_pop = self.pop.get(world);
-        add_settlement(world, orig_pop.borrow().culture.clone(), self.dest.clone(), self.migrating);
+        add_settlement(world, orig_pop.borrow().culture.clone(), self.dest.clone(), orig_pop.borrow().polity.clone(), self.migrating);
         orig_pop.borrow_mut().size -= self.migrating;
     }
 }

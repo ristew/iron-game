@@ -29,12 +29,24 @@ pub trait UiCommand {
     fn run(&self, world: &World, ui_system: &mut UiSystem);
 }
 
-fn province_coordinate(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
+pub type InfoContainerPtr<T> = Rc<RefCell<InfoContainer<T>>>;
+
+fn province_coordinate(id: ProvinceId) -> InfoContainerPtr<Province> {
     id.info_container(|province, _| format!("{:?}", province.borrow().coordinate))
 }
 
-fn province_population(id: ProvinceId) -> Rc<RefCell<InfoContainer<Province>>> {
+fn province_population(id: ProvinceId) -> InfoContainerPtr<Province> {
     id.info_container(|province, w| format!("{:?}", province.borrow().population(w)))
+}
+
+fn province_controller(id: ProvinceId) -> InfoContainerPtr<Province> {
+    id.info_container(|province, w| {
+        if let Some(controller) = &province.borrow().controller {
+            format!("Controlled by {}", controller.get(w).borrow().name)
+        } else {
+            "Uncontrolled".to_owned()
+        }
+    })
 }
 
 macro_rules! infotainer {
@@ -86,6 +98,10 @@ fn pop_list(
     pop_list
 }
 
+fn settlement_controller(id: SettlementId) -> InfoContainerPtr<Settlement> {
+    id.info_container(|settlement, w| format!("Controlled by {}", settlement.borrow().controller.get(w).borrow().name))
+}
+
 pub struct SettlementInfoBuilder(SettlementId);
 
 impl InfoPanelBuilder for SettlementInfoBuilder {
@@ -96,6 +112,7 @@ impl InfoPanelBuilder for SettlementInfoBuilder {
         ui_system.info_panel.add_children(vec![
             DateContainer::new(),
             infotainer!(self.0, name),
+            settlement_controller(self.0.clone()),
             pop_list,
         ]);
     }
@@ -180,6 +197,7 @@ impl InfoPanelBuilder for ProvinceInfoBuilder {
             DateContainer::new(),
             infotainer!(self.0, terrain),
             infotainer!(self.0, coordinate),
+            province_controller(self.0.clone()),
             province_population(self.0.clone()),
             settlement_list,
         ]);

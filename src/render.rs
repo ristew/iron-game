@@ -64,7 +64,7 @@ impl Overlay for PopOverlay {
                 province_pixel_pos.x - w / 2.0,
                 province_pixel_pos.y - h / 2.0,
             ];
-            let map_pct = *population as f32 / max_pop as f32;
+            let map_pct = 0.2 + 0.8 * *population as f32 / max_pop as f32;
             self.map.add(
                 DrawParam::new()
                     .dest(hex_dest)

@@ -23,6 +23,7 @@ pub enum StorageType {
     Religion,
     Settlement,
     Language,
+    Polity,
 }
 
 impl StorageType {
@@ -39,6 +40,8 @@ impl StorageType {
             Self::Settlement
         } else if TypeId::of::<T>() == TypeId::of::<Language>() {
             Self::Language
+        } else if TypeId::of::<T>() == TypeId::of::<Polity>() {
+            Self::Polity
         } else {
             panic!("could not match Id type to storage, {}", stringify! {T});
         }
@@ -103,6 +106,10 @@ where
         // } else {
 
         // }
+    }
+
+    pub fn has_id(&self, id: &Id) -> bool {
+        self.id_map.contains_key(&id.num())
     }
 }
 
@@ -208,30 +215,21 @@ impl Storages {
 impl Default for Storages {
     fn default() -> Self {
         let mut storages: HashMap<StorageType, Box<dyn Any>> = HashMap::new();
-        storages.insert(
-            StorageType::Province,
-            Box::new(ObjectStorage::<Province, ProvinceId>::new()),
-        );
-        storages.insert(
-            StorageType::Pop,
-            Box::new(ObjectStorage::<Pop, PopId>::new()),
-        );
-        storages.insert(
-            StorageType::Settlement,
-            Box::new(ObjectStorage::<Settlement, SettlementId>::new()),
-        );
-        storages.insert(
-            StorageType::Culture,
-            Box::new(ObjectStorage::<Culture, CultureId>::new()),
-        );
-        storages.insert(
-            StorageType::Religion,
-            Box::new(ObjectStorage::<Religion, ReligionId>::new()),
-        );
-        storages.insert(
-            StorageType::Language,
-            Box::new(ObjectStorage::<Language, LanguageId>::new()),
-        );
+        macro_rules! init_storage {
+            ( $typ:ident ) => {
+                storages.insert(
+                    StorageType::$typ,
+                    Box::new(ObjectStorage::<$typ, <$typ as IronData>::IdType>::new()),
+                );
+            }
+        }
+        init_storage!(Province);
+        init_storage!(Pop);
+        init_storage!(Settlement);
+        init_storage!(Culture);
+        init_storage!(Religion);
+        init_storage!(Language);
+        init_storage!(Polity);
         Self { storages }
     }
 }

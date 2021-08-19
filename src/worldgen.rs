@@ -1,7 +1,7 @@
 use std::{collections::HashMap, f32::consts::PI};
 
 use noise::{Fbm, HybridMulti, NoiseFn, Perlin};
-use rand::{thread_rng, Rng};
+use rand::{Rng, random, thread_rng};
 use rand_distr::Uniform;
 
 use crate::*;
@@ -53,6 +53,7 @@ pub fn generate_world(world: &mut World) {
             coordinate,
             harvest_month: 8,
             settlements: Vec::new(),
+            controller: None,
         });
     }
 }
@@ -90,19 +91,31 @@ pub fn create_test_world(world: &mut World) {
                 continue;
             }
 
-            for i in 0..thread_rng().sample(Uniform::new(0, 2)) {
-                add_test_settlement(world, culture_id.clone(), province_id.clone());
+            if random::<f32>() > 0.9 {
+                let polity_id = world.storages.get_id::<Polity>();
+                for i in 0..thread_rng().sample(Uniform::new(1, 3)) {
+                    add_test_settlement(world, culture_id.clone(), province_id.clone(), polity_id.clone());
+                }
             }
         }
     }
 }
 
-fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId) {
-    add_settlement(world, culture_id, province_id, 100);
+fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId) {
+    add_settlement(world, culture_id, province_id, polity_id, 100);
 }
-pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, size: isize) {
+pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId, size: isize) {
     let settlement_id = world.storages.get_id::<Settlement>();
     let pop_id = world.storages.get_id::<Pop>();
+    if !world.storages.get_storage::<Polity>().has_id(&polity_id) {
+        world.insert(Polity {
+            id: polity_id.clone(),
+            name: culture_id.get(world).borrow().language.get(world).borrow().generate_name(2),
+            primary_culture: culture_id.clone(),
+            capital: settlement_id.clone(),
+            level: PolityLevel::Tribe,
+        });
+    }
 
     let pop = world.insert(Pop {
         id: pop_id.clone(),
@@ -118,6 +131,7 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
         kid_buffer: KidBuffer::new(),
         owned_goods: GoodStorage(HashMap::new()),
         migration_status: None,
+        polity: polity_id.clone(),
     });
 
     world
@@ -141,5 +155,6 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
         primary_culture: culture_id.clone(),
         province: province_id.clone(),
         level: SettlementLevel::Village,
+        controller: polity_id.clone(),
     });
 }

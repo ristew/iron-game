@@ -24,6 +24,7 @@ pub struct Pop {
     pub satiety: Satiety,
     pub farmed_good: Option<GoodType>,
     pub migration_status: Option<MigrationStatus>,
+    pub polity: PolityId,
 }
 
 impl Pop {
