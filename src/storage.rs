@@ -56,8 +56,7 @@ pub trait Storage {
     where
         Self: Sized;
     fn insert(&mut self, item: Self::Object) -> Self::Id;
-    fn get_id(&mut self) -> Self::Id;
-    fn get_ref(&self, id: &Self::Id) -> Rc<RefCell<Self::Object>>;
+    fn get_id(&mut self) -> usize;
     fn remove(&mut self, id: &Self::Id);
 }
 
@@ -88,26 +87,6 @@ where
     T: IronData<IdType = Id>,
     Id: IronId<Target = T>,
 {
-    fn load_id(&self, id: &T::IdType) {
-        let rc = self.id_map.get(&id.num()).unwrap().upgrade().unwrap();
-        id.set_reference(rc.clone());
-    }
-
-    fn get_ref_impl(&self, id: &Id) -> Rc<RefCell<T>> {
-        if let Some(rc) = id.try_borrow() {
-            rc.clone()
-        } else {
-            let rc = self.id_map.get(&id.num()).unwrap().upgrade().unwrap();
-
-            id.set_reference(rc.clone());
-            rc.clone()
-        }
-        // if id.1.borrow().is_none() {
-        // } else {
-
-        // }
-    }
-
     pub fn has_id(&self, id: &Id) -> bool {
         self.id_map.contains_key(&id.num())
     }
@@ -126,6 +105,9 @@ where
     }
     fn insert(&mut self, item: Self::Object) -> Self::Id {
         let rc = Rc::new(RefCell::new(item));
+        let id = Self::Id::new(self.get_id(), IronIdInner(rc.clone()));
+        rc.borrow_mut().set_id(id);
+
         self.rcs.push(rc.clone());
         self.id_map
             .insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
@@ -133,9 +115,9 @@ where
         x.id()
     }
 
-    fn get_id(&mut self) -> <T as IronData>::IdType {
+    fn get_id(&mut self) -> usize {
         self.id_ctr += 1;
-        T::IdType::new(self.id_ctr)
+        self.id_ctr
     }
 
     fn remove(&mut self, id: &T::IdType) {
@@ -146,10 +128,6 @@ where
         {
             println!("removed item: {:?}", removed.borrow().id());
         }
-    }
-
-    fn get_ref(&self, id: &Id) -> Rc<RefCell<T>> {
-        self.get_ref_impl(id)
     }
 }
 
@@ -192,19 +170,20 @@ impl Storages {
             .downcast_mut::<ObjectStorage<T, T::IdType>>()
             .unwrap()
     }
-    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>>
-    where
-        T: IronData + 'static,
-    {
-        self.get_storage::<T>().get_ref(id)
-    }
+    // pub fn get_ref<T>(&self, id: &T::IdType) -> IronIdInner<T>
+    // where
+    //     T: IronData + 'static,
+    // {
+    //     self.get_storage::<T>().get_ref(id)
+    // }
     pub fn insert<T>(&mut self, data: T) -> T::IdType
     where
         T: IronData + 'static,
     {
         self.get_storage_mut::<T>().insert(data)
+
     }
-    pub fn get_id<T>(&mut self) -> T::IdType
+    pub fn get_id<T>(&mut self) -> usize
     where
         T: IronData + 'static,
     {

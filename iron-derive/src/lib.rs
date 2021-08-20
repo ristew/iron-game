@@ -14,11 +14,14 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         #[derive(Clone)]
-        pub struct #name_id(usize, RefCell<Option<Weak<RefCell<#name>>>>);
+        pub struct #name_id {
+            num: usize,
+            inner: IronIdInner<#name>,
+        }
 
         impl PartialEq for #name_id {
             fn eq(&self, other: &Self) -> bool {
-                self.0 == other.0
+                self.num == other.num
             }
         }
 
@@ -26,13 +29,13 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
 
         impl std::hash::Hash for #name_id {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-                self.0.hash(state);
+                self.num.hash(state);
             }
         }
 
         impl std::fmt::Debug for #name_id {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(format!("{}({})", #name_id_str, self.0).as_str())
+                f.write_str(format!("{}({})", #name_id_str, self.num).as_str())
             }
         }
 
@@ -41,24 +44,30 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
         impl IronId for #name_id {
             type Target = #name;
 
-            fn try_borrow(&self) -> Option<#name_ptr> {
-                self.1.borrow().as_ref().map(|weak| { weak.upgrade().unwrap().clone() })
-            }
-
-            fn set_reference(&self, reference: std::rc::Rc<std::cell::RefCell<Self::Target>>) {
-                *self.1.borrow_mut() = Some(std::rc::Rc::downgrade(&reference));
-            }
-
-            fn new(id: usize) -> Self {
-                Self(id, std::cell::RefCell::new(None))
+            fn new(num: usize, inner: IronIdInner<Self::Target>) -> Self {
+                Self {
+                    num,
+                    inner,
+                }
             }
 
             fn num(&self) -> usize {
-                self.0
+                self.num
             }
 
-            fn get(&self, world: &World) -> Rc<RefCell<Self::Target>> {
-                world.get_ref::<Self::Target>(self)
+            fn get_inner<'a>(&'a self) -> &'a IronIdInner<Self::Target> {
+                &self.inner
+            }
+
+        }
+
+        impl #name_id {
+            pub fn get<'a>(&'a self) -> impl std::ops::Deref<Target = <Self as IronId>::Target> + 'a {
+                self.get_inner().borrow()
+            }
+
+            pub fn get_mut<'a>(&'a self) -> impl std::ops::DerefMut<Target = <Self as IronId>::Target> + 'a {
+                self.get_inner().borrow_mut()
             }
         }
 
@@ -90,7 +99,11 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
             // type StorageType = crate::storage::Storage<Object = #name>;
 
             fn id(&self) -> Self::IdType {
-                self.id.clone()
+                self.id.clone().unwrap()
+            }
+
+            fn set_id(&mut self, id: Self::IdType) {
+                self.id = Some(id.clone());
             }
         }
     };

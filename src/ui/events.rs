@@ -32,17 +32,17 @@ pub trait UiCommand {
 pub type InfoContainerPtr<T> = Rc<RefCell<InfoContainer<T>>>;
 
 fn province_coordinate(id: ProvinceId) -> InfoContainerPtr<Province> {
-    id.info_container(|province, _| format!("{:?}", province.borrow().coordinate))
+    id.info_container(|province, _| format!("{:?}", province.get().coordinate))
 }
 
 fn province_population(id: ProvinceId) -> InfoContainerPtr<Province> {
-    id.info_container(|province, w| format!("{:?}", province.borrow().population(w)))
+    id.info_container(|province, w| format!("{:?}", province.get().population(w)))
 }
 
 fn province_controller(id: ProvinceId) -> InfoContainerPtr<Province> {
     id.info_container(|province, w| {
-        if let Some(controller) = &province.borrow().controller {
-            format!("Controlled by {}", controller.get(w).borrow().name)
+        if let Some(controller) = &province.get().controller {
+            format!("Controlled by {}", controller.get().name)
         } else {
             "Uncontrolled".to_owned()
         }
@@ -51,7 +51,7 @@ fn province_controller(id: ProvinceId) -> InfoContainerPtr<Province> {
 
 macro_rules! infotainer {
     ( $id:expr, $path:tt ) => {
-        $id.info_container(|data, _| format!("{}", data.borrow().$path))
+        $id.info_container(|data, _| format!("{}", data.get().$path))
     };
 }
 
@@ -68,8 +68,8 @@ fn pop_info(pop_id: &PopId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
         .add_children(vec![pop_id.info_container(|pop, w| {
             format!(
                 "{} of {}",
-                pop.borrow().size,
-                pop.borrow().culture.get(w).borrow().name
+                pop.get().size,
+                pop.get().culture.get().name
             )
         })]);
 
@@ -90,7 +90,7 @@ fn pop_list(
         Color::new(0.0, 0.0, 0.0, 0.2),
         Constraints::new(0.0, 0.0, 999.9, 999.9),
     );
-    for pop_id in settlement.get(world).borrow().pops.iter() {
+    for pop_id in settlement.get().pops.iter() {
         pop_list
             .borrow_mut()
             .add_child(pop_info(&pop_id, ui_system));
@@ -99,14 +99,13 @@ fn pop_list(
 }
 
 fn settlement_controller(id: SettlementId) -> InfoContainerPtr<Settlement> {
-    id.info_container(|settlement, w| format!("Controlled by {}", settlement.borrow().controller.get(w).borrow().name))
+    id.info_container(|settlement, w| format!("Controlled by {}", settlement.get().controller.get().name))
 }
 
 pub struct SettlementInfoBuilder(SettlementId);
 
 impl InfoPanelBuilder for SettlementInfoBuilder {
     fn build(&self, world: &World, ui_system: &mut UiSystem) {
-        let province = self.0.get(world);
         let pop_list = pop_list(self.0.clone(), world, ui_system);
         ui_system.info_panel.clear();
         ui_system.info_panel.add_children(vec![
@@ -126,7 +125,7 @@ impl UiCommand for ShowSettlementInfo {
     }
 }
 
-fn settlement_info(settlement_id: &SettlementId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
+fn settlement_info(settlement_id: SettlementId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
     let info_list = BaseUiContainer::new_rc(
         Point2::new(4.0, 4.0),
         Color::new(0.0, 0.0, 0.0, 0.2),
@@ -139,8 +138,8 @@ fn settlement_info(settlement_id: &SettlementId, ui_system: &mut UiSystem) -> Bu
         settlement_id.info_container(|settlement, w| {
             format!(
                 "{:?} of {}",
-                settlement.borrow().level,
-                settlement.borrow().population(w)
+                settlement.get().level,
+                settlement.get().population(w)
             )
         }),
     ]);
@@ -153,7 +152,7 @@ fn settlement_info(settlement_id: &SettlementId, ui_system: &mut UiSystem) -> Bu
         move |world, sys| {
             sys.events
                 .add(Box::new(CommandEvent(Rc::new(ShowSettlementInfo(
-                    SettlementId::new(set_id),
+                    settlement_id.clone()
                 )))));
         },
     ));
@@ -170,10 +169,10 @@ fn settlement_list(
         Color::new(0.0, 0.0, 0.0, 0.2),
         Constraints::new(0.0, 0.0, 999.9, 999.9),
     );
-    for settlement_id in province.get(world).borrow().settlements.iter() {
+    for settlement_id in province.get().settlements.iter() {
         settlement_list
             .borrow_mut()
-            .add_child(settlement_info(&settlement_id, ui_system));
+            .add_child(settlement_info(settlement_id.clone(), ui_system));
     }
     settlement_list
 }
@@ -197,6 +196,7 @@ impl InfoPanelBuilder for ProvinceInfoBuilder {
             DateContainer::new(),
             infotainer!(self.0, terrain),
             infotainer!(self.0, coordinate),
+            infotainer!(self.0, coastal),
             province_controller(self.0.clone()),
             province_population(self.0.clone()),
             settlement_list,

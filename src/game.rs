@@ -6,17 +6,7 @@ use ggez::{
 };
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, thread_rng};
-use std::{
-    cell::{RefCell, RefMut},
-    collections::{HashMap, VecDeque},
-    fmt::{Debug, Display},
-    hash::Hash,
-    marker::PhantomData,
-    ops::Deref,
-    rc::{Rc, Weak},
-    thread::{sleep, sleep_ms},
-    time::Duration,
-};
+use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, time::Duration};
 pub use GoodType::*;
 
 pub const TILE_SIZE_X: f32 = 16.0;
@@ -185,6 +175,16 @@ impl Factored for Terrain {
                 Terrain::Forest => Factor::factor(0.5),
                 Terrain::Ocean => Factor::factor(0.0),
             }),
+            FactorType::SettlementRating => Some(match *self {
+                Terrain::Plains => Factor::factor(1.0),
+                // slightly prefer hills for defensibility
+                Terrain::Hills => Factor::factor(1.1),
+                Terrain::Mountains => Factor::factor(0.2),
+                Terrain::Desert => Factor::factor(0.1),
+                Terrain::Marsh => Factor::factor(0.5),
+                Terrain::Forest => Factor::factor(0.5),
+                Terrain::Ocean => Factor::factor(0.0),
+            }),
         }
     }
 }
@@ -220,6 +220,12 @@ impl Factored for Climate {
                 Climate::Mild => Factor::factor(1.0),
                 Climate::Cold => Factor::factor(0.7),
             }),
+            FactorType::SettlementRating => Some(match *self {
+                Climate::Tropical => Factor::factor(0.8),
+                Climate::Dry => Factor::factor(0.6),
+                Climate::Mild => Factor::factor(1.0),
+                Climate::Cold => Factor::factor(0.8),
+            }),
         }
     }
 }
@@ -250,6 +256,7 @@ pub enum GoodType {
 #[derive(Debug, Copy, Clone)]
 pub enum FactorType {
     CarryingCapacity,
+    SettlementRating,
 }
 
 pub enum FactorOp {
@@ -360,23 +367,46 @@ impl GoodType {
     }
 }
 
+pub struct FeatureMap<K>(HashMap<K, f32>) where K: Hash + Eq;
+impl<K> FeatureMap<K> where K: Hash + Eq {
+    pub fn add(&mut self, ftype: K, amount: f32) -> f32 {
+        if let Some(amt) = self.0.get_mut(&ftype) {
+            *amt += amount;
+            *amt
+        } else {
+            self.0.insert(ftype, amount);
+            amount
+        }
+    }
+}
+
+// impl ProvinceId {
+//     pub fn get_inner<'a>(&'a self, world: &World) -> impl std::ops::Deref<Target = <Self as IronId>::Target> + 'a {
+//         if let Some(ptr) = &*self.1.borrow() {
+//             ptr.upgrade().unwrap().borrow()
+//         } else {
+//             self.get(world).borrow()
+//         }
+//     }
+// }
+
 #[iron_data]
 pub struct Province {
-    pub id: ProvinceId,
+    pub id: Option<ProvinceId>,
     pub settlements: Vec<SettlementId>,
     pub terrain: Terrain,
     pub climate: Climate,
     pub coordinate: Coordinate,
     pub harvest_month: usize,
     pub controller: Option<PolityId>,
+    pub coastal: bool,
 }
 
 impl Province {
     pub fn population(&self, world: &World) -> isize {
         let mut total_pop = 0;
         for settlement_id in self.settlements.iter() {
-            let settlement = settlement_id.get(world);
-            total_pop += settlement.borrow().population(world);
+            total_pop += settlement_id.get().population(world);
         }
         total_pop
     }
@@ -401,6 +431,22 @@ impl Province {
         };
         total
     }
+
+    pub fn generate_site(&self, world: &World) -> Vec<SettlementFeature> {
+        // let occupied_settlements = self.settlements.iter().map(|sid| sid.get());
+        let mut feature_ps: HashMap<SettlementFeature, f32> = HashMap::new();
+        match self.terrain {
+            Terrain::Plains => {},
+            Terrain::Hills => {
+            },
+            Terrain::Mountains => {},
+            Terrain::Desert => {},
+            Terrain::Marsh => {},
+            Terrain::Forest => {},
+            Terrain::Ocean => {},
+        };
+        Vec::new()
+    }
 }
 
 pub enum PolityLevel {
@@ -413,13 +459,14 @@ pub enum PolityLevel {
 
 #[iron_data]
 pub struct Polity {
-    pub id: PolityId,
+    pub id: Option<PolityId>,
     pub name: String,
     pub primary_culture: CultureId,
-    pub capital: SettlementId,
+    pub capital: Option<SettlementId>,
     pub level: PolityLevel,
 }
 
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum SettlementFeature {
     Hilltop,
     Riverside,
@@ -438,6 +485,16 @@ impl Factored for SettlementFeature {
                 SettlementFeature::Riverside => Some(Factor::factor(1.2)),
                 _ => None,
             },
+            FactorType::SettlementRating => match *self {
+                SettlementFeature::Hilltop => Some(Factor::factor(1.5)),
+                SettlementFeature::Riverside => Some(Factor::factor(1.5)),
+                SettlementFeature::Oceanside => Some(Factor::factor(1.1)),
+                SettlementFeature::Harbor => Some(Factor::factor(1.5)),
+                SettlementFeature::Mines(_) => Some(Factor::factor(1.3)),
+                SettlementFeature::Fertile => Some(Factor::factor(1.4)),
+                SettlementFeature::Infertile => Some(Factor::factor(0.5)),
+                _ => None,
+            },
         }
     }
 }
@@ -451,9 +508,21 @@ pub enum SettlementLevel {
     Metropolis,
 }
 
+impl SettlementLevel {
+    pub fn rating(&self) -> f32 {
+        match *self {
+            SettlementLevel::Hamlet => 5.0,
+            SettlementLevel::Village => 10.0,
+            SettlementLevel::Town => 20.0,
+            SettlementLevel::City => 40.0,
+            SettlementLevel::Metropolis => 80.0,
+        }
+    }
+}
+
 #[iron_data]
 pub struct Settlement {
-    pub id: SettlementId,
+    pub id: Option<SettlementId>,
     pub name: String,
     pub pops: Vec<PopId>,
     pub features: Vec<SettlementFeature>,
@@ -464,25 +533,29 @@ pub struct Settlement {
 }
 
 impl Settlement {
-    pub fn carrying_capacity(&self, world: &World) -> f32 {
-        let province_rc = self.province.get(world);
-        let province = province_rc.borrow();
-        let factor = FactorType::CarryingCapacity;
+    pub fn factor(&self, world: &World, ftype: FactorType, base: f32) -> f32 {
         let mut factors = vec![
-            province.terrain.factor(factor),
-            province.climate.factor(factor),
+            self.province.get().terrain.factor(ftype),
+            self.province.get().climate.factor(ftype),
         ];
-        factors.extend(self.features.iter().map(|f| f.factor(factor)));
-        apply_maybe_factors(500.0, factors)
+        factors.extend(self.features.iter().map(|f| f.factor(ftype)));
+        apply_maybe_factors(base, factors)
+    }
+    pub fn carrying_capacity(&self, world: &World) -> f32 {
+        self.factor(world, FactorType::CarryingCapacity, 500.0)
     }
 
     pub fn population(&self, world: &World) -> isize {
         let mut total_pop = 0;
         for pop_id in self.pops.iter() {
-            let pop = pop_id.get(world);
-            total_pop += pop.borrow().size;
+            total_pop += pop_id.get().size;
         }
         total_pop
+    }
+
+    // rating is a measure of how attractive a settlement is
+    pub fn rating(&self, world: &World) -> f32 {
+        self.factor(world, FactorType::SettlementRating, self.level.rating())
     }
 }
 
@@ -623,16 +696,34 @@ impl Hash for TechLevel {
     }
 }
 
+pub struct IronIdInner<T>(pub Rc<RefCell<T>>) where T: Sized;
+
+impl<T> Clone for IronIdInner<T> {
+    fn clone(&self) -> Self {
+        IronIdInner(self.0.clone())
+    }
+}
+
+impl <T> IronIdInner<T> {
+    pub fn get_inner_ref<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        self.0.borrow()
+    }
+    pub fn borrow<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        self.0.borrow()
+    }
+    pub fn borrow_mut<'a>(&'a self) -> impl DerefMut<Target = T> + 'a {
+        self.0.borrow_mut()
+    }
+}
+
 pub trait IronId {
     type Target: IronData<IdType = Self> + Sized;
-    fn try_borrow(&self) -> Option<Rc<RefCell<Self::Target>>>;
-    fn set_reference(&self, reference: Rc<RefCell<Self::Target>>);
-    fn new(id: usize) -> Self;
+    fn new(id: usize, inner: IronIdInner<Self::Target>) -> Self;
     fn num(&self) -> usize;
-    fn get(&self, world: &World) -> Rc<RefCell<Self::Target>>;
+    fn get_inner(&self) -> &IronIdInner<Self::Target>;
     fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
     where
-        F: Fn(Rc<RefCell<Self::Target>>, &World) -> String + 'static,
+        F: Fn(Self, &World) -> String + 'static,
         Self: Sized + Clone,
     {
         InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
@@ -641,9 +732,10 @@ pub trait IronId {
 
 pub trait IronData {
     type DataType;
-    type IdType: IronId<Target = Self> + Debug;
+    type IdType: IronId<Target = Self> + Debug + Clone;
 
     fn id(&self) -> Self::IdType;
+    fn set_id(&mut self, id: Self::IdType);
 }
 
 pub struct MainState {

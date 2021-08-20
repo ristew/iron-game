@@ -219,18 +219,21 @@ impl Event for MigrationDoneEvent {
     }
 
     fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        let pop_rc = self.0.get(world);
-        let pop = pop_rc.borrow();
-        let migration_status = pop.migration_status.as_ref()?;
-        if migration_status.date < world.date.day {
-            return None;
+        if let Some(migration_status) = self.0.get().migration_status.as_ref() {
+            if migration_status.date < world.date.day {
+                None
+            } else {
+                Some(Box::new(PopMigrateCommand {
+                    pop: self.0.clone(),
+                    dest: migration_status.dest.clone(),
+                    migrating: migration_status.migrating.min(self.0.get().size),
+                }))
+            }
+
+        } else {
+            None
         }
 
 
-        Some(Box::new(PopMigrateCommand {
-            pop: self.0.clone(),
-            dest: migration_status.dest.clone(),
-            migrating: migration_status.migrating.min(pop.size),
-        }))
     }
 }

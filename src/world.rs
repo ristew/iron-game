@@ -50,12 +50,6 @@ pub fn parse_path(path: &'static str) {
     let path_regex = r"((self\.)?\w+)\.(.*)";
 }
 
-macro_rules! object {
-	( ex:expr p:expr ) => {
-        let path = parse_path(stringify!{$ex})
-	};
-}
-
 impl Debug for Date {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(format!("{}/{}/{}", self.month(), self.day_of_month(), self.year()).as_str())
@@ -95,31 +89,32 @@ impl World {
     }
 
     pub fn insert_province(&mut self, province: Province) {
+        let province_id = self.insert::<Province>(province);
         self.province_coord_map
-            .insert(province.coordinate, province.id.clone());
-        self.insert::<Province>(province);
+            .insert(province_id.get().coordinate, province_id.clone());
     }
 
     pub fn get_province_coordinate(&self, coord: Coordinate) -> Option<ProvinceId> {
         self.province_coord_map.get(&coord).map(|p| p.clone())
     }
 
-    pub fn insert_settlement(&mut self, settlement: Settlement) {
-        settlement
+    pub fn insert_settlement(&mut self, settlement: Settlement) -> SettlementId {
+        let set_id = self.insert::<Settlement>(settlement);
+        set_id
+            .get()
             .province
-            .get(self)
-            .borrow_mut()
+            .get_mut()
             .settlements
-            .push(settlement.id.clone());
-        self.insert::<Settlement>(settlement);
+            .push(set_id.clone());
+        set_id
     }
 
-    pub fn get_ref<T>(&self, id: &T::IdType) -> Rc<RefCell<T>>
-    where
-        T: IronData + 'static,
-    {
-        self.storages.get_ref::<T>(id)
-    }
+    // pub fn get_ref<T>(&self, id: &T::IdType) -> IronIdInner<T>
+    // where
+    //     T: IronData + 'static,
+    // {
+    //     self.storages.get_ref::<T>(id)
+    // }
 
     // pub fn map_borrow<T, F, V>(&self, id: &T::IdType, f: F) -> &V where F: Fn(&T) -> &V, T: IronData + 'static {
     //     let refcell = self.get_ref::<T>(id);
@@ -169,7 +164,7 @@ pub fn pops_yearly_growth(world: &World) {
         world.add_command(Box::new(PopGrowthCommand {
             babies,
             deaths,
-            pop: pop_rc.borrow().id.clone(),
+            pop: pop_rc.borrow().id().clone(),
         }));
     }
 }
@@ -178,7 +173,7 @@ pub fn harvest_provinces(world: &World) {
     for province in world.storages.get_storage::<Province>().rcs.iter() {
         if world.date.month() == province.borrow().harvest_month {
             for settlement in province.borrow().settlements.iter() {
-                for pop in settlement.get(world).borrow().pops.iter() {
+                for pop in settlement.get().pops.iter() {
                     harvest(pop, world);
                 }
             }

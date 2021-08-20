@@ -59,7 +59,7 @@ impl Overlay for PopOverlay {
         }
         for (province_id, population) in province_pops.iter() {
             // println!("add hex to overlay map");
-            let province_pixel_pos = province_id.get(world).borrow().coordinate.base_pixel_pos();
+            let province_pixel_pos = province_id.get().coordinate.base_pixel_pos();
             let hex_dest = [
                 province_pixel_pos.x - w / 2.0,
                 province_pixel_pos.y - h / 2.0,
@@ -218,7 +218,7 @@ impl RenderContext {
         if let Some(province_id) = &world.selected_province {
             let (w, h) = tile_sizes();
             let selected_hex = hex_mesh(ctx, Color::new(0.0, 0.0, 0.0, 0.2));
-            let province_pixel_pos = province_id.get(world).borrow().coordinate.base_pixel_pos();
+            let province_pixel_pos = province_id.get().coordinate.base_pixel_pos();
             let hex_dest = [
                 province_pixel_pos.x - w / 2.0,
                 province_pixel_pos.y - h / 2.0,

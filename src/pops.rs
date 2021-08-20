@@ -14,7 +14,7 @@ pub struct MigrationStatus {
 
 #[iron_data]
 pub struct Pop {
-    pub id: PopId,
+    pub id: Option<PopId>,
     pub size: isize,
     pub culture: CultureId,
     pub settlement: SettlementId,
@@ -43,13 +43,10 @@ impl Pop {
 }
 
 pub fn harvest(pop: &PopId, world: &World) {
-    let pop_rc = pop.get(world);
-
-    let pop = pop_rc.borrow();
     // println!("harvest pop?");
-    if let Some(farmed_good) = pop.farmed_good {
-        let mut farmed_amount = pop.size as f32;
-        let carrying_capacity = pop.settlement.get(world).borrow().carrying_capacity(world);
+    if let Some(farmed_good) = pop.get().farmed_good {
+        let mut farmed_amount = pop.get().size as f32;
+        let carrying_capacity = pop.get().settlement.get().carrying_capacity(world);
         if farmed_amount > carrying_capacity {
             farmed_amount = carrying_capacity + (farmed_amount - carrying_capacity).sqrt();
         }
@@ -60,14 +57,14 @@ pub fn harvest(pop: &PopId, world: &World) {
         world.add_command(Box::new(SetGoodsCommand {
             good_type: farmed_good,
             amount: farmed_amount * 300.0,
-            pop: pop.id.clone(),
+            pop: pop.clone(),
         }));
     }
 }
 
 #[iron_data]
 pub struct Language {
-    pub id: LanguageId,
+    pub id: Option<LanguageId>,
     pub name: String,
     pub vowels: Vec<String>,
     pub initial_consonants: Vec<String>,
@@ -98,7 +95,7 @@ pub fn sample_list(list: &Vec<String>) -> String {
 }
 
 impl Language {
-    pub fn new(id: LanguageId) -> Self {
+    pub fn new() -> Self {
         let vowel_chance = 0.75;
         let vowels = list_filter_chance(
             &map_string(vec![
@@ -119,7 +116,7 @@ impl Language {
         let end_consonants = list_filter_chance(&consonants, 0.50);
 
         Self {
-            id,
+            id: None,
             name: "".to_owned(),
             vowels,
             initial_consonants,
@@ -158,7 +155,7 @@ pub enum CultureFeature {
 
 #[iron_data]
 pub struct Culture {
-    pub id: CultureId,
+    pub id: Option<CultureId>,
     pub name: String,
     pub religion: ReligionId,
     pub language: LanguageId,
@@ -167,6 +164,6 @@ pub struct Culture {
 
 #[iron_data]
 pub struct Religion {
-    pub id: ReligionId,
+    pub id: Option<ReligionId>,
     pub name: String,
 }

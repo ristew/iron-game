@@ -274,7 +274,7 @@ where
     T: IronData,
 {
     pub id: T::IdType,
-    pub mapping: Box<dyn Fn(Rc<RefCell<T>>, &World) -> String>,
+    pub mapping: Box<dyn Fn(T::IdType, &World) -> String>,
     pub inner: TextContainer,
 }
 
@@ -284,7 +284,7 @@ where
 {
     pub fn new<F>(id: T::IdType, mapping: Box<F>) -> Rc<RefCell<Self>>
     where
-        F: Fn(Rc<RefCell<T>>, &World) -> String + 'static,
+        F: Fn(T::IdType, &World) -> String + 'static,
     {
         Rc::new(RefCell::new(Self {
             id,
@@ -295,7 +295,7 @@ where
 
     pub fn new_world<F>(id: T::IdType, mapping: F) -> Rc<RefCell<Self>>
     where
-        F: Fn(Rc<RefCell<T>>, &World) -> String + 'static,
+        F: Fn(T::IdType, &World) -> String + 'static,
     {
         Rc::new(RefCell::new(Self {
             id,
@@ -323,7 +323,8 @@ where
     }
 
     fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
-        self.inner.text = new_text((*self.mapping)(self.id.get(world), world));
+        self.inner.text = new_text((*self.mapping)(self.id.clone(), world));
+
         self.inner.layout(ctx, constraints, world)
     }
 }

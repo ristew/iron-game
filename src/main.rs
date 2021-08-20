@@ -1,4 +1,7 @@
 #![feature(drain_filter)]
+#![feature(trace_macros)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 
 use ggez::{
     conf::{WindowMode, WindowSetup},
@@ -36,7 +39,7 @@ pub use worldgen::*;
 fn main() {
     let cb = ContextBuilder::new("iron-age", "ristew")
         .window_setup(WindowSetup::default().vsync(false).title("iron-age"))
-        .window_mode(WindowMode::default().dimensions(1200.0, 800.0));
+        .window_mode(WindowMode::default().dimensions(1150.0, 750.0));
     let (mut ctx, evt_loop) = cb.build().unwrap();
     let game = game::MainState::new(&mut ctx);
     event::run(ctx, evt_loop, game);
