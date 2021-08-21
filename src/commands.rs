@@ -118,8 +118,11 @@ impl Command for PopEatCommand {
             dead_kids += pop.get_mut().kid_buffer.starve();
             if total_satiety.base < target_base * 0.3 {
                 dead_kids += pop.get_mut().kid_buffer.starve();
+                dead_kids += pop.get_mut().kid_buffer.starve();
+                dead_kids += pop.get_mut().kid_buffer.starve();
+                let dead_adult_mean = pop_size as f32 * (0.3 - total_satiety.base / target_base) / 50.0;
                 dead_adults += pop.get_mut()
-                    .die(positive_isample(1 + pop_size / 40, 2 + pop_size / 20))
+                    .die(positive_isample(1 + pop_size / 40, 2 + dead_adult_mean as isize));
             }
 
             world.events.add(Box::new(PopStarveEvent {
@@ -179,7 +182,7 @@ impl Command for PopSeekMigrationCommand {
                     }
                 }
                 if individual_event(logistic(target_value)) {
-                    println!("migrate {:?} to {}", self.pop, random_point);
+                    // println!("migrate {:?} to {}", self.pop, random_point);
                     let size = self.pop.get().size / 5;
                     self.pop.get_mut().migration_status = Some(MigrationStatus {
                         migrating: size,
@@ -201,7 +204,7 @@ pub struct PopMigrateCommand {
 
 impl Command for PopMigrateCommand {
     fn run(&self, world: &mut World) {
-        println!("finally migrate {:?}", self.pop);
+        // println!("finally migrate {:?}", self.pop);
         add_settlement(world, self.pop.get().culture.clone(), self.dest.clone(), self.pop.get().polity.clone(), self.migrating);
         self.pop.get_mut().size -= self.migrating;
     }

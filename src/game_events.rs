@@ -203,7 +203,7 @@ impl Event for PopStarveEvent {
     }
 
     fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        // println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
+        println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
         Some(Box::new(PopSeekMigrationCommand {
             pop: self.pop.clone(),
             starved: self.amount + self.children / 2,

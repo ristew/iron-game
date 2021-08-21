@@ -882,28 +882,29 @@ pub const FRAME_TIME: f32 = 1.0 / FPS;
 
 impl EventHandler<GameError> for MainState {
     fn update(&mut self, ctx: &mut ggez::Context) -> Result<(), GameError> {
-        self.frame += 1;
 
         if timer::delta(ctx).as_secs_f32() < FRAME_TIME {
             timer::sleep(Duration::from_secs_f32(FRAME_TIME) - timer::delta(ctx));
         }
+        for i in 0..25 {
+            self.frame += 1;
+            if self.target_speed > 0 && self.frame % self.target_speed == 0 {
+                self.world.date.day += 1;
+                day_tick(&self.world);
 
-        if self.target_speed > 0 && self.frame % self.target_speed == 0 {
-            self.world.date.day += 1;
-            day_tick(&self.world);
-
-            if self.world.date.is_month() {
-                // println!("{:?}", self.world.date);
-                // println!("{:?}", self.world.camera.p);
-            }
-            if let Some(overlay) = self.render_context.overlay.as_mut() {
-                if self.world.date.is_month() || overlay.map().get_instance_params().len() == 0 {
-                    overlay.update(&self.world);
+                if self.world.date.is_month() {
+                    // println!("{:?}", self.world.date);
+                    // println!("{:?}", self.world.camera.p);
+                }
+                if let Some(overlay) = self.render_context.overlay.as_mut() {
+                    if self.world.date.is_month() || overlay.map().get_instance_params().len() == 0 {
+                        overlay.update(&self.world);
+                    }
                 }
             }
+            self.world.process_events();
+            self.world.process_command_queue();
         }
-        self.world.process_events();
-        self.world.process_command_queue();
         timer::yield_now();
         Ok(())
     }
