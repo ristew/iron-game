@@ -5,8 +5,8 @@ use ggez::{
     timer, Context, GameError,
 };
 use lazy_static::lazy_static;
-use rand::{prelude::SliceRandom, thread_rng};
-use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, time::Duration};
+use rand::{prelude::SliceRandom, random, thread_rng};
+use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, time::Duration};
 pub use GoodType::*;
 
 pub const TILE_SIZE_X: f32 = 16.0;
@@ -164,7 +164,7 @@ impl Display for Terrain {
 }
 
 impl Factored for Terrain {
-    fn factor(&self, factor: FactorType) -> Option<Factor> {
+    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
         match factor {
             FactorType::CarryingCapacity => Some(match *self {
                 Terrain::Plains => Factor::factor(1.0),
@@ -212,7 +212,7 @@ pub enum Climate {
 }
 
 impl Factored for Climate {
-    fn factor(&self, factor: FactorType) -> Option<Factor> {
+    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
         match factor {
             FactorType::CarryingCapacity => Some(match *self {
                 Climate::Tropical => Factor::factor(1.2),
@@ -226,6 +226,7 @@ impl Factored for Climate {
                 Climate::Mild => Factor::factor(1.0),
                 Climate::Cold => Factor::factor(0.8),
             }),
+            _ => None,
         }
     }
 }
@@ -301,7 +302,7 @@ pub fn apply_maybe_factors(base: f32, factors: Vec<Option<Factor>>) -> f32 {
 }
 
 pub trait Factored {
-    fn factor(&self, factor: FactorType) -> Option<Factor>;
+    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor>;
 }
 
 lazy_static! {
@@ -369,6 +370,9 @@ impl GoodType {
 
 pub struct FeatureMap<K>(HashMap<K, f32>) where K: Hash + Eq;
 impl<K> FeatureMap<K> where K: Hash + Eq {
+    pub fn new() -> Self {
+        Self(HashMap::new())
+    }
     pub fn add(&mut self, ftype: K, amount: f32) -> f32 {
         if let Some(amt) = self.0.get_mut(&ftype) {
             *amt += amount;
@@ -390,6 +394,7 @@ impl<K> FeatureMap<K> where K: Hash + Eq {
 //     }
 // }
 
+use SettlementFeature::*;
 #[iron_data]
 pub struct Province {
     pub id: Option<ProvinceId>,
@@ -432,12 +437,54 @@ impl Province {
         total
     }
 
-    pub fn generate_site(&self, world: &World) -> Vec<SettlementFeature> {
-        // let occupied_settlements = self.settlements.iter().map(|sid| sid.get());
-        let mut feature_ps: HashMap<SettlementFeature, f32> = HashMap::new();
+    fn settlement_feature_map(&self, world: &World) -> FeatureMap<SettlementFeature> {
+        let mut fmap: FeatureMap<SettlementFeature> = FeatureMap::new();
+        if self.coastal {
+            fmap.add(Oceanside, match self.terrain {
+                Terrain::Plains => 0.5,
+                Terrain::Hills => 0.5,
+                Terrain::Mountains => 0.9,
+                Terrain::Desert => 0.9,
+                Terrain::Marsh => 0.7,
+                Terrain::Forest => 0.6,
+                Terrain::Ocean => 0.0,
+            });
+            self.exp_f(&mut fmap, Harbor, 0.2);
+        }
         match self.terrain {
-            Terrain::Plains => {},
+            // SettlementFeature::Hilltop => match self.terrain {
+            //     Terrain::Plains => 0.05,
+            //     Terrain::Hills => 0.4,
+            //     Terrain::Mountains => 0.2,
+            //     Terrain::Desert => 0.2,
+            //     Terrain::Marsh => 0.05,
+            //     Terrain::Forest => 0.3,
+            //     Terrain::Ocean => 0.0,
+            // },
+            // SettlementFeature::Fertile => match self.terrain {
+            //     Terrain::Plains => 0.15,
+            //     Terrain::Hills => 0.1,
+            //     Terrain::Marsh => 0.05,
+            //     Terrain::Forest => 0.1,
+            //     _ => 0.0,
+            // },
+            // Hilltop,
+            // Riverside,
+            // Oceanside,
+            // Harbor,
+            // Mines(GoodType),
+            // Fertile,
+            // DominantCrop(GoodType),
+            // Infertile,
+            Terrain::Plains => {
+                self.exp_f(&mut fmap, Hilltop, 0.1);
+                self.exp_f(&mut fmap, Fertile, 0.2);
+                fmap.add(Infertile, self.decay_site_factor(0.05, |_| true));
+            },
             Terrain::Hills => {
+                self.exp_f(&mut fmap, Hilltop, 0.4);
+                self.exp_f(&mut fmap, Fertile, 0.05);
+                fmap.add(Infertile, self.decay_site_factor(0.08, |_| true));
             },
             Terrain::Mountains => {},
             Terrain::Desert => {},
@@ -445,7 +492,58 @@ impl Province {
             Terrain::Forest => {},
             Terrain::Ocean => {},
         };
-        Vec::new()
+        fmap
+    }
+
+    pub fn exp_f(&self, fmap: &mut FeatureMap<SettlementFeature>, f: SettlementFeature, b: f32) {
+        let nf = self.settlements.iter().map(|s| s.get().has_feature(f)).filter(|x| *x).count();
+        fmap.add(f, b.powi(nf as i32 + 1));
+    }
+
+    pub fn decay_site_factor<F>(&self, b: f32, predicate: F) -> f32 where F: Fn(SettlementId) -> bool {
+        let count = self.settlements.iter().map(|s| predicate(s.clone())).filter(|x| *x).count();
+        (1.0 + b).powi(count as i32 + 1) - 1.0
+    }
+
+    pub fn generate_site(&self, world: &World) -> Site {
+        // let occupied_settlements = self.settlements.iter().map(|sid| sid.get());
+        let feature_map  = self.settlement_feature_map(world);
+        let mut features: HashSet<SettlementFeature> = HashSet::new();
+        for (&feature, &p) in feature_map.0.iter() {
+            if p < random() {
+                features.insert(feature);
+                if feature == Harbor {
+                    features.insert(Oceanside);
+                }
+                if feature == Fertile {
+                    features.remove(&Infertile);
+                }
+                if feature == Infertile {
+                    features.remove(&Fertile);
+                }
+            }
+        }
+
+        Site {
+            features,
+        }
+    }
+
+    pub fn generate_sites(&self, world: &World, num_sites: usize) -> Vec<Site> {
+        let mut candidates = Vec::new();
+        for i in 0..num_sites {
+            candidates.push(self.generate_site(world));
+        }
+        candidates
+    }
+}
+
+impl Factored for Province {
+    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
+        Some(Factor::bonus(match factor {
+            FactorType::CarryingCapacity => todo!(),
+            FactorType::SettlementRating => todo!(),
+        }))
     }
 }
 
@@ -466,7 +564,12 @@ pub struct Polity {
     pub level: PolityLevel,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(Clone)]
+pub struct Site {
+    pub features: HashSet<SettlementFeature>,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub enum SettlementFeature {
     Hilltop,
     Riverside,
@@ -479,7 +582,7 @@ pub enum SettlementFeature {
 }
 
 impl Factored for SettlementFeature {
-    fn factor(&self, factor: FactorType) -> Option<Factor> {
+    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
         match factor {
             FactorType::CarryingCapacity => match *self {
                 SettlementFeature::Riverside => Some(Factor::factor(1.2)),
@@ -525,7 +628,7 @@ pub struct Settlement {
     pub id: Option<SettlementId>,
     pub name: String,
     pub pops: Vec<PopId>,
-    pub features: Vec<SettlementFeature>,
+    pub features: HashSet<SettlementFeature>,
     pub primary_culture: CultureId,
     pub province: ProvinceId,
     pub level: SettlementLevel,
@@ -535,10 +638,10 @@ pub struct Settlement {
 impl Settlement {
     pub fn factor(&self, world: &World, ftype: FactorType, base: f32) -> f32 {
         let mut factors = vec![
-            self.province.get().terrain.factor(ftype),
-            self.province.get().climate.factor(ftype),
+            self.province.get().terrain.factor(world, ftype),
+            self.province.get().climate.factor(world, ftype),
         ];
-        factors.extend(self.features.iter().map(|f| f.factor(ftype)));
+        factors.extend(self.features.iter().map(|f| f.factor(world, ftype)));
         apply_maybe_factors(base, factors)
     }
     pub fn carrying_capacity(&self, world: &World) -> f32 {
@@ -556,6 +659,15 @@ impl Settlement {
     // rating is a measure of how attractive a settlement is
     pub fn rating(&self, world: &World) -> f32 {
         self.factor(world, FactorType::SettlementRating, self.level.rating())
+    }
+
+    pub fn has_feature(&self, feature: SettlementFeature) -> bool {
+        for my_feature in self.features.iter() {
+            if feature == *my_feature {
+                return true;
+            }
+        }
+        false
     }
 }
 

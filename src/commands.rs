@@ -173,6 +173,7 @@ impl Command for PopSeekMigrationCommand {
                 let mut target_value = target_province_id.get().base_living_target_value();
 
                 for settlement in target_province_id.get().settlements.iter() {
+                    target_value -= 1.0;
                     if settlement.get().primary_culture != self.pop.get().culture {
                         target_value -= 2.0;
                     }

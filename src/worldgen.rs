@@ -126,11 +126,13 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
     add_settlement(world, culture_id, province_id, polity_id, 100)
 }
 pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId, size: isize) -> SettlementId {
+    let sites = province_id.get().generate_sites(world, 3);
+
     let settlement_id = world.insert_settlement(Settlement {
         id: None,
         name: culture_id.get().language.get().generate_name(4),
         pops: vec![],
-        features: Vec::new(),
+        features: HashSet::new(),
         primary_culture: culture_id.clone(),
         province: province_id.clone(),
         level: SettlementLevel::Village,
@@ -152,6 +154,8 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
         migration_status: None,
         polity: polity_id.clone(),
     });
+    let site = pop_id.get().evaluate_sites(sites, world, province_id.clone());
+    settlement_id.get_mut().features = site.features;
     settlement_id.get_mut().pops.push(pop_id.clone());
 
     pop_id

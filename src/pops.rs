@@ -40,6 +40,40 @@ impl Pop {
         // println!("size: {}", self.size);
         before - self.size
     }
+
+    pub fn settlement_site_threshold(&self) -> f32 {
+        10.0
+    }
+
+    pub fn evaluate_site(&self, site: &Site, world: &World, province: ProvinceId) -> f32 {
+        let mut score = 20.0;
+        for feature in site.features.iter() {
+            score += match *feature {
+                SettlementFeature::Hilltop => 10.0,
+                SettlementFeature::Riverside => 10.0,
+                SettlementFeature::Oceanside => 10.0,
+                SettlementFeature::Harbor => 20.0,
+                SettlementFeature::Mines(_) => 10.0,
+                SettlementFeature::Fertile => 10.0,
+                SettlementFeature::DominantCrop(_) => 0.0,
+                SettlementFeature::Infertile => -10.0,
+            };
+        }
+        score
+    }
+
+    pub fn evaluate_sites(&self, sites: Vec<Site>, world: &World, province: ProvinceId) -> Site {
+        let mut max_site = &sites[0];
+        let mut max_value = 0.0;
+        for site in sites.iter() {
+            let value = self.evaluate_site(site, world, province.clone());
+            if value > max_value {
+                max_value = value;
+                max_site = site;
+            }
+        }
+        max_site.clone()
+    }
 }
 
 pub fn harvest(pop: &PopId, world: &World) {
