@@ -123,16 +123,41 @@ impl Command for PopEatCommand {
                 let dead_adult_mean = pop_size as f32 * (0.3 - total_satiety.base / target_base) / 50.0;
                 dead_adults += pop.get_mut()
                     .die(positive_isample(1 + pop_size / 40, 2 + dead_adult_mean as isize));
+                if pop.get().size == 0 {
+
+                }
+            }
+            if dead_adults < 0 {
+                let dead_adult_mean = pop_size as f32 * (0.3 - total_satiety.base / target_base) / 50.0;
+                // println!("dead adults: {} - {}", dead_adults, dead_adult_mean);
             }
 
-            world.events.add(Box::new(PopStarveEvent {
-                pop: self.0.clone(),
-                amount: dead_adults,
-                children: dead_kids,
-            }));
+            if dead_kids > 0 || dead_adults > 0 {
+                world.events.add(Box::new(PopStarveEvent {
+                    pop: self.0.clone(),
+                    amount: dead_adults,
+                    children: dead_kids,
+                }));
+            }
+        }
+
+        if pop.get().size == 0 {
+            world.events.add(Box::new(PopDestroyedEvent(pop.clone())));
         }
 
         pop.get_mut().satiety = total_satiety;
+    }
+}
+
+pub struct DestroyPopCommand(pub PopId);
+
+impl Command for DestroyPopCommand {
+    fn run(&self, world: &mut World) {
+        self.0.get().settlement.get_mut().pops.retain(|p| *p != self.0);
+        if self.0.get().settlement.get().pops.len() == 0 {
+            println!("settlement abandoned! {}", self.0.get().settlement.get().name);
+        }
+        world.remove(&self.0);
     }
 }
 

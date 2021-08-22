@@ -54,6 +54,7 @@ pub fn generate_world(world: &mut World) {
             coordinate,
             harvest_month: 8,
             settlements: Vec::new(),
+            features: HashSet::new(),
             controller: None,
             coastal: false,
         });

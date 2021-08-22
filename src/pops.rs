@@ -59,6 +59,8 @@ impl Pop {
                 SettlementFeature::Infertile => -10.0,
             };
         }
+        println!("evaluate site {:?} score {}", site, score);
+
         score
     }
 

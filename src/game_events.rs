@@ -13,11 +13,12 @@ pub enum EventKind {
     MouseButtonDown,
     PopStarve,
     MigrationDone,
+    PopDestroyed,
 }
 
 pub trait Event {
     fn kind(&self) -> EventKind;
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>>;
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>>;
 }
 
 // #[derive(Default)]
@@ -26,7 +27,7 @@ pub trait Event {
 // }
 
 // impl EventCommandMapper {
-//     pub fn map_event(&self, event: Box<dyn Event>) -> Option<Box<dyn Command>> {
+//     pub fn map_event(&self, event: Box<dyn Event>) -> Vec<Box<dyn Command>> {
 //         if let Some(event_mapper) = self.event_mappers.get(&event.kind()) {
 //             event_mapper.map_event(event)
 //         } else {
@@ -114,8 +115,8 @@ impl Event for KeyDownEvent {
         EventKind::KeyDown
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        None
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        vec![]
     }
 }
 
@@ -129,8 +130,8 @@ impl Event for KeyUpEvent {
         EventKind::KeyUp
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        None
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        vec![]
     }
 }
 
@@ -143,14 +144,14 @@ impl Event for KeyHeldEvent {
         EventKind::KeyHeld
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
         let d = 2.0 * world.camera.zoom;
         match self.keycode {
-            KeyCode::W => Some(Box::new(MoveCameraCommand(Point2::new(0.0, d)))),
-            KeyCode::A => Some(Box::new(MoveCameraCommand(Point2::new(d, 0.0)))),
-            KeyCode::S => Some(Box::new(MoveCameraCommand(Point2::new(0.0, -d)))),
-            KeyCode::D => Some(Box::new(MoveCameraCommand(Point2::new(-d, 0.0)))),
-            _ => None,
+            KeyCode::W => vec![Box::new(MoveCameraCommand(Point2::new(0.0, d)))],
+            KeyCode::A => vec![Box::new(MoveCameraCommand(Point2::new(d, 0.0)))],
+            KeyCode::S => vec![Box::new(MoveCameraCommand(Point2::new(0.0, -d)))],
+            KeyCode::D => vec![Box::new(MoveCameraCommand(Point2::new(-d, 0.0)))],
+            _ => vec![],
         }
     }
 }
@@ -162,8 +163,8 @@ impl Event for MouseWheelEvent {
         EventKind::MouseWheel
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        Some(Box::new(ZoomCameraCommand(-self.0 * 0.05)))
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        vec![Box::new(ZoomCameraCommand(-self.0 * 0.05))]
     }
 }
 
@@ -182,11 +183,11 @@ impl Event for MouseButtonDownEvent {
         EventKind::MouseButtonDown
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
         if let Some(province_id) = world.pixel_to_province(self.0) {
-            Some(Box::new(SelectProvince(province_id.clone())))
+            vec![Box::new(SelectProvince(province_id.clone()))]
         } else {
-            None
+            vec![]
         }
     }
 }
@@ -202,12 +203,12 @@ impl Event for PopStarveEvent {
         EventKind::PopStarve
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
-        println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
-        Some(Box::new(PopSeekMigrationCommand {
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        // println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
+        vec![Box::new(PopSeekMigrationCommand {
             pop: self.pop.clone(),
             starved: self.amount + self.children / 2,
-        }))
+        })]
     }
 }
 
@@ -218,22 +219,34 @@ impl Event for MigrationDoneEvent {
         EventKind::MigrationDone
     }
 
-    fn map_event(&self, world: &World) -> Option<Box<dyn Command>> {
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
         if let Some(migration_status) = self.0.get().migration_status.as_ref() {
             if migration_status.date < world.date.day {
-                None
+                vec![]
             } else {
-                Some(Box::new(PopMigrateCommand {
+                vec![Box::new(PopMigrateCommand {
                     pop: self.0.clone(),
                     dest: migration_status.dest.clone(),
                     migrating: migration_status.migrating.min(self.0.get().size),
-                }))
+                })]
             }
 
         } else {
-            None
+            vec![]
         }
 
 
+    }
+}
+
+pub struct PopDestroyedEvent(pub PopId);
+
+impl Event for PopDestroyedEvent {
+    fn kind(&self) -> EventKind {
+        EventKind::PopDestroyed
+    }
+
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        vec![Box::new(DestroyPopCommand(self.0.clone()))]
     }
 }

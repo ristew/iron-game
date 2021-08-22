@@ -120,13 +120,13 @@ where
         self.id_ctr
     }
 
-    fn remove(&mut self, id: &T::IdType) {
+    fn remove(&mut self, id: &Self::Id) {
         self.id_map.remove(&id.num());
         for removed in self
             .rcs
             .drain_filter(|item| item.borrow().id().num() == id.num())
         {
-            println!("removed item: {:?}", removed.borrow().id());
+            // println!("removed item: {:?}", removed.borrow().id());
         }
     }
 }
@@ -183,6 +183,15 @@ impl Storages {
         self.get_storage_mut::<T>().insert(data)
 
     }
+
+    pub fn remove<T>(&mut self, id: &T::IdType)
+    where
+        T: IronData + 'static,
+    {
+        self.get_storage_mut::<T>().remove(id);
+
+    }
+
     pub fn get_id<T>(&mut self) -> usize
     where
         T: IronData + 'static,

@@ -384,15 +384,12 @@ impl<K> FeatureMap<K> where K: Hash + Eq {
     }
 }
 
-// impl ProvinceId {
-//     pub fn get_inner<'a>(&'a self, world: &World) -> impl std::ops::Deref<Target = <Self as IronId>::Target> + 'a {
-//         if let Some(ptr) = &*self.1.borrow() {
-//             ptr.upgrade().unwrap().borrow()
-//         } else {
-//             self.get(world).borrow()
-//         }
-//     }
-// }
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ProvinceFeature {
+    Fertile,
+    Infertile,
+    NaturalHarbor,
+}
 
 use SettlementFeature::*;
 #[iron_data]
@@ -402,6 +399,7 @@ pub struct Province {
     pub terrain: Terrain,
     pub climate: Climate,
     pub coordinate: Coordinate,
+    pub features: HashSet<ProvinceFeature>,
     pub harvest_month: usize,
     pub controller: Option<PolityId>,
     pub coastal: bool,
@@ -449,42 +447,24 @@ impl Province {
                 Terrain::Forest => 0.6,
                 Terrain::Ocean => 0.0,
             });
-            self.exp_f(&mut fmap, Harbor, 0.2);
+            if self.features.contains(&ProvinceFeature::NaturalHarbor) {
+                self.find_one(&mut fmap, Harbor, 0.3);
+            }
+        }
+        if self.features.contains(&ProvinceFeature::Fertile) {
+            self.exp_f(&mut fmap, Fertile, 0.1);
+        }
+        if self.features.contains(&ProvinceFeature::Infertile) {
+            fmap.add(Infertile, 0.2);
         }
         match self.terrain {
-            // SettlementFeature::Hilltop => match self.terrain {
-            //     Terrain::Plains => 0.05,
-            //     Terrain::Hills => 0.4,
-            //     Terrain::Mountains => 0.2,
-            //     Terrain::Desert => 0.2,
-            //     Terrain::Marsh => 0.05,
-            //     Terrain::Forest => 0.3,
-            //     Terrain::Ocean => 0.0,
-            // },
-            // SettlementFeature::Fertile => match self.terrain {
-            //     Terrain::Plains => 0.15,
-            //     Terrain::Hills => 0.1,
-            //     Terrain::Marsh => 0.05,
-            //     Terrain::Forest => 0.1,
-            //     _ => 0.0,
-            // },
-            // Hilltop,
-            // Riverside,
-            // Oceanside,
-            // Harbor,
-            // Mines(GoodType),
-            // Fertile,
-            // DominantCrop(GoodType),
-            // Infertile,
             Terrain::Plains => {
                 self.exp_f(&mut fmap, Hilltop, 0.1);
-                self.exp_f(&mut fmap, Fertile, 0.2);
                 fmap.add(Infertile, self.decay_site_factor(0.05, |_| true));
             },
             Terrain::Hills => {
-                self.exp_f(&mut fmap, Hilltop, 0.4);
-                self.exp_f(&mut fmap, Fertile, 0.05);
-                fmap.add(Infertile, self.decay_site_factor(0.08, |_| true));
+                fmap.add(Hilltop, 0.4);
+                fmap.add(Infertile, self.decay_site_factor(0.05, |_| true));
             },
             Terrain::Mountains => {},
             Terrain::Desert => {},
@@ -498,6 +478,13 @@ impl Province {
     pub fn exp_f(&self, fmap: &mut FeatureMap<SettlementFeature>, f: SettlementFeature, b: f32) {
         let nf = self.settlements.iter().map(|s| s.get().has_feature(f)).filter(|x| *x).count();
         fmap.add(f, b.powi(nf as i32 + 1));
+    }
+
+    pub fn find_one(&self, fmap: &mut FeatureMap<SettlementFeature>, f: SettlementFeature, p: f32) {
+        let nf = self.settlements.iter().map(|s| s.get().has_feature(f)).filter(|x| *x).count();
+        if nf == 0 {
+            fmap.add(f, p);
+        }
     }
 
     pub fn decay_site_factor<F>(&self, b: f32, predicate: F) -> f32 where F: Fn(SettlementId) -> bool {
@@ -564,7 +551,7 @@ pub struct Polity {
     pub level: PolityLevel,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Site {
     pub features: HashSet<SettlementFeature>,
 }
@@ -585,7 +572,9 @@ impl Factored for SettlementFeature {
     fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
         match factor {
             FactorType::CarryingCapacity => match *self {
-                SettlementFeature::Riverside => Some(Factor::factor(1.2)),
+                SettlementFeature::Riverside => Some(Factor::factor(1.5)),
+                SettlementFeature::Fertile => Some(Factor::factor(1.4)),
+                SettlementFeature::Infertile => Some(Factor::factor(0.5)),
                 _ => None,
             },
             FactorType::SettlementRating => match *self {
@@ -645,7 +634,7 @@ impl Settlement {
         apply_maybe_factors(base, factors)
     }
     pub fn carrying_capacity(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::CarryingCapacity, 500.0)
+        self.factor(world, FactorType::CarryingCapacity, 50.0)
     }
 
     pub fn population(&self, world: &World) -> isize {
@@ -662,12 +651,7 @@ impl Settlement {
     }
 
     pub fn has_feature(&self, feature: SettlementFeature) -> bool {
-        for my_feature in self.features.iter() {
-            if feature == *my_feature {
-                return true;
-            }
-        }
-        false
+        self.features.contains(&feature)
     }
 }
 
@@ -693,7 +677,7 @@ impl KidBuffer {
         let cohort = sample(3.0).abs().min(12.0) as usize;
         if self.0.len() > cohort {
             let cohort_size = self.0[cohort];
-            let dead_kids = positive_isample(cohort_size / 20 + 1, cohort_size / 10 + 1);
+            let dead_kids = positive_isample(cohort_size / 20 + 2, cohort_size / 5 + 1);
             // println!("cohort {}, size {}, dead {}", cohort, cohort_size, dead_kids);
             self.0[cohort] = (cohort_size - dead_kids).max(0);
             cohort_size - self.0[cohort]

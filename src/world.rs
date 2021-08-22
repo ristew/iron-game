@@ -82,7 +82,7 @@ impl World {
         self.events.update(self);
         let events = self.events.events.replace(Vec::new());
         for event in events {
-            if let Some(command) = event.map_event(self) {
+            for command in event.map_event(self).into_iter() {
                 self.add_command(command);
             }
         }
@@ -109,25 +109,18 @@ impl World {
         set_id
     }
 
-    // pub fn get_ref<T>(&self, id: &T::IdType) -> IronIdInner<T>
-    // where
-    //     T: IronData + 'static,
-    // {
-    //     self.storages.get_ref::<T>(id)
-    // }
-
-    // pub fn map_borrow<T, F, V>(&self, id: &T::IdType, f: F) -> &V where F: Fn(&T) -> &V, T: IronData + 'static {
-    //     let refcell = self.get_ref::<T>(id);
-    //     f(refcell.into_inner())
-
-    // }
-
     pub fn insert<T>(&mut self, data: T) -> T::IdType
     where
         T: IronData + 'static,
     {
-        // let id = self.storages.get
         self.storages.insert(data)
+    }
+
+    pub fn remove<Id>(&mut self, id: &Id)
+    where
+        Id: IronId + 'static,
+    {
+        self.storages.remove::<Id::Target>(id);
     }
 
     pub fn new(ctx: &mut Context) -> Self {
