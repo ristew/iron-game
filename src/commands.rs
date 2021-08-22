@@ -149,13 +149,27 @@ impl Command for PopEatCommand {
     }
 }
 
+pub struct DestroySettlementCommand(pub SettlementId);
+
+impl Command for DestroySettlementCommand {
+    fn run(&self, world: &mut World) {
+        // where do we keep track of settlements?
+        self.0.get().province.get_mut().settlements.retain(|s| *s != self.0);
+        if Some(self.0.clone()) == self.0.get().controller.get().capital {
+            println!("polity over? move capital?");
+        }
+        world.remove(&self.0);
+    }
+}
+
 pub struct DestroyPopCommand(pub PopId);
 
 impl Command for DestroyPopCommand {
     fn run(&self, world: &mut World) {
         self.0.get().settlement.get_mut().pops.retain(|p| *p != self.0);
         if self.0.get().settlement.get().pops.len() == 0 {
-            println!("settlement abandoned! {}", self.0.get().settlement.get().name);
+            // println!("settlement abandoned! {}", self.0.get().settlement.get().name);
+            DestroySettlementCommand(self.0.get().settlement.clone()).run(world);
         }
         world.remove(&self.0);
     }
@@ -180,19 +194,16 @@ impl Command for ZoomCameraCommand {
 
 pub struct PopSeekMigrationCommand {
     pub pop: PopId,
-    pub starved: isize,
+    pub pressure: f32,
 }
 
 impl Command for PopSeekMigrationCommand {
     fn run(&self, world: &mut World) {
-        let migration_desire = self.starved;
-        if migration_desire > 1 {
+        let migration_desire = self.pressure;
+        if migration_desire > 1.0 {
             let this_province = self.pop.get().settlement.get().province.clone();
             let coordinate = this_province.get().coordinate;
-            let random_point = Coordinate::new(
-                coordinate.x + thread_rng().sample(Uniform::new(-5, 5)),
-                coordinate.y + thread_rng().sample(Uniform::new(-5, 5)),
-            );
+            let random_point = coordinate.random_local();
             if random_point == coordinate {
                 // got unlucky, just die
                 return;

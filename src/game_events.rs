@@ -207,7 +207,7 @@ impl Event for PopStarveEvent {
         // println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
         vec![Box::new(PopSeekMigrationCommand {
             pop: self.pop.clone(),
-            starved: self.amount + self.children / 2,
+            pressure: (self.amount + self.children / 2) as f32,
         })]
     }
 }

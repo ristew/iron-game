@@ -108,6 +108,15 @@ impl Coordinate {
         }
     }
 
+    pub fn random_local(&self) -> Coordinate {
+        let directions = vec![(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1), (0, 0)];
+        let dir = directions.choose(&mut thread_rng()).unwrap();
+        Coordinate {
+            x: self.x + dir.0,
+            y: self.y + dir.1,
+        }
+    }
+
     pub fn neighbors_in_radius(&self, radius: isize) -> Vec<Coordinate> {
         let mut items = Vec::new();
         for x in -radius..(radius + 1) {
@@ -122,6 +131,7 @@ impl Coordinate {
         }
         items
     }
+
     pub fn neighbors_in_radius_iter(&self, radius: isize) -> CoordinateIter {
         CoordinateIter {
             neighbors: self.neighbors_in_radius(radius),
@@ -535,11 +545,12 @@ impl Factored for Province {
 }
 
 pub enum PolityLevel {
-    Tribe,
-    Confederacy,
-    CityState,
-    Kingdom,
-    Republic,
+    Tribe, // one village
+    Chiefdom, // a few villages united under a chief
+    Confederacy, // a chiefdom superstate, largely integrated for war
+    CityState, // ruled from a city with it's surrounding landscape
+    Kingdom, // the classic, heriditary monarchy
+    Republic, // run by and for a noble class
 }
 
 #[iron_data]
@@ -633,8 +644,9 @@ impl Settlement {
         factors.extend(self.features.iter().map(|f| f.factor(world, ftype)));
         apply_maybe_factors(base, factors)
     }
+
     pub fn carrying_capacity(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::CarryingCapacity, 50.0)
+        self.factor(world, FactorType::CarryingCapacity, 100.0)
     }
 
     pub fn population(&self, world: &World) -> isize {

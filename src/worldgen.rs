@@ -108,19 +108,21 @@ pub fn create_test_world(world: &mut World) {
             }
 
             if random::<f32>() > 0.9 {
-                let polity_id = world.insert(Polity {
-                    id: None,
-                    name: language_id.get().generate_name(2),
-                    primary_culture: culture_id.clone(),
-                    capital: None,
-                    level: PolityLevel::Tribe,
-                });
-                for i in 0..thread_rng().sample(Uniform::new(1, 3)) {
-                    add_test_settlement(world, culture_id.clone(), province_id.clone(), polity_id.clone());
-                }
+                let polity_id = add_polity(world, language_id.get().generate_name(2), culture_id.clone(), PolityLevel::Tribe);
+                add_test_settlement(world, culture_id.clone(), province_id.clone(), polity_id);
             }
         }
     }
+}
+
+pub fn add_polity(world: &mut World, name: String, culture_id: CultureId, level: PolityLevel) -> PolityId {
+    world.insert(Polity {
+        id: None,
+        name,
+        primary_culture: culture_id.clone(),
+        capital: None,
+        level: PolityLevel::Tribe,
+    })
 }
 
 fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId) -> SettlementId {
@@ -159,9 +161,13 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
     settlement_id.get_mut().features = site.features;
     settlement_id.get_mut().pops.push(pop_id.clone());
 
+    if polity_id.get().capital.is_none() {
+        polity_id.get_mut().capital = Some(settlement_id.clone());
+    }
+
     pop_id
         .get_mut()
         .owned_goods
-        .add(Wheat, size as f32 * 200.0);
+        .add(Wheat, size as f32 * 250.0);
     settlement_id
 }

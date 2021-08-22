@@ -142,10 +142,8 @@ impl World {
     }
 }
 
-fn random_place_name(culture: CultureId, world: &World) -> String {
-    let mut name = String::new();
-
-    name
+fn random_place_name(culture: CultureId) -> String {
+    culture.get().language.get().generate_name(3)
 }
 
 pub fn pops_yearly_growth(world: &World) {
@@ -154,6 +152,7 @@ pub fn pops_yearly_growth(world: &World) {
         // println!("pop size: {}", pop_rc.borrow().size);
         let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
         let deaths = positive_isample(2, pop_rc.borrow().size / 50);
+        println!("babies {} deaths {} size {}", babies, deaths, pop_rc.borrow().size);
         world.add_command(Box::new(PopGrowthCommand {
             babies,
             deaths,

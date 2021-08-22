@@ -83,13 +83,22 @@ pub fn harvest(pop: &PopId, world: &World) {
     if let Some(farmed_good) = pop.get().farmed_good {
         let mut farmed_amount = pop.get().size as f32;
         let carrying_capacity = pop.get().settlement.get().carrying_capacity(world);
-        if farmed_amount > carrying_capacity {
+        let comfortable_limit = carrying_capacity / 2.0;
+        let pop_size = pop.get().settlement.get().population(world) as f32;
+        if pop_size > comfortable_limit {
+            // population pressure on available land, seek more
+            world.add_command(Box::new(PopSeekMigrationCommand {
+                pop: pop.clone(),
+                pressure: (pop_size / comfortable_limit).powi(2),
+            }))
+        }
+        if pop_size > carrying_capacity {
             farmed_amount = carrying_capacity + (farmed_amount - carrying_capacity).sqrt();
         }
-        if random::<f32>() > 0.9 {
-            // println!("failed harvest! halving farmed goods");
-            farmed_amount *= 0.5;
-        }
+        // if random::<f32>() > 0.9 {
+        //     // println!("failed harvest! halving farmed goods");
+        //     farmed_amount *= 0.7;
+        // }
         world.add_command(Box::new(SetGoodsCommand {
             good_type: farmed_good,
             amount: farmed_amount * 300.0,
