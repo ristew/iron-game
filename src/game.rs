@@ -554,6 +554,11 @@ pub enum PolityLevel {
     Republic, // run by and for a noble class
 }
 
+pub enum SuccessorLaw {
+    Inheritance(CharacterId),
+    Election,
+}
+
 #[iron_data]
 pub struct Polity {
     pub id: Option<PolityId>,
@@ -562,6 +567,7 @@ pub struct Polity {
     pub capital: Option<SettlementId>,
     pub level: PolityLevel,
     pub leader: CharacterId,
+    pub successor_law: SuccessorLaw,
 }
 
 #[derive(Clone, Debug)]
@@ -636,6 +642,7 @@ pub struct Settlement {
     pub level: SettlementLevel,
     pub controller: PolityId,
     pub headman: CharacterId,
+    pub successor_law: SuccessorLaw,
 }
 
 impl Settlement {

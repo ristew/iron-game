@@ -13,6 +13,13 @@ pub struct Character {
     pub birthday: Date,
     pub sex: Sex,
     pub health: f32,
+    pub death: Option<Date>,
+}
+
+impl Character {
+    pub fn title(&self, world: &World) -> String {
+        format!("{}, {}", self.name, self.birthday.age(world.date))
+    }
 }
 
 pub trait Agent {

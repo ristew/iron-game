@@ -155,7 +155,36 @@ pub struct KillCharacterCommand(pub CharacterId);
 
 impl Command for KillCharacterCommand {
     fn run(&self, world: &mut World) {
-        world.remove(&self.0);
+        self.0.get_mut().death = Some(world.date);
+        // trigger succession events
+    }
+}
+
+pub struct PolityUpdateLeaderCommand(pub PolityId);
+
+impl Command for PolityUpdateLeaderCommand {
+    fn run(&self, world: &mut World) {
+        let leader = match &self.0.get().successor_law {
+            SuccessorLaw::Election => self.0.get().primary_culture.get().generate_character(Sex::Male, positive_isample(8, 45), world),
+            SuccessorLaw::Inheritance(heir) => heir.clone(),
+        };
+        let old_leader = self.0.get().leader.clone();
+        self.0.get_mut().leader = leader.clone();
+        println!("change leader: {} to {}", old_leader.get().title(world), leader.get().title(world));
+    }
+}
+
+pub struct SettlementUpdateHeadmanCommand(pub SettlementId);
+
+impl Command for SettlementUpdateHeadmanCommand {
+    fn run(&self, world: &mut World) {
+        let headman = match &self.0.get().successor_law {
+            SuccessorLaw::Election => self.0.get().primary_culture.get().generate_character(Sex::Male, positive_isample(8, 45), world),
+            SuccessorLaw::Inheritance(heir) => heir.clone(),
+        };
+        let old_headman = self.0.get().headman.clone();
+        self.0.get_mut().headman = headman.clone();
+        println!("change headman: {} to {}", old_headman.get().title(world), headman.get().title(world));
     }
 }
 

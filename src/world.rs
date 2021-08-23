@@ -46,7 +46,7 @@ impl Date {
     }
 
     pub fn age(&self, now: Date) -> usize {
-        (self.day - now.day) / 360
+        (now.day - self.day) / 360
     }
 }
 
@@ -183,6 +183,11 @@ pub fn harvest_provinces(world: &World) {
 pub fn day_tick(world: &World) {
     if world.date.is_year() {
         pops_yearly_growth(world);
+        for character in world.storages.get_storage::<Character>().ids.iter() {
+            if character.get().death.is_none() && character.get().birthday.age(world.date) as f32 > character.get().health {
+                world.events.add(Rc::new(CharacterDiedEvent(character.clone())));
+            }
+        }
     }
 
     if world.date.is_month() {

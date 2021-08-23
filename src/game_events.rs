@@ -344,11 +344,24 @@ pub struct CharacterDiedEvent(pub CharacterId);
 
 impl Event for CharacterDiedEvent {
     fn kind(&self) -> EventKind {
-        todo!()
+        EventKind::CharacterDied
     }
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
-        todo!()
+        println!("character died: {}", self.0.get().title(world));
+        let mut commands: Vec<Box<dyn Command>> = Vec::new();
+        for polity in world.storages.get_storage::<Polity>().ids.iter() {
+            if polity.get().leader == self.0 {
+                commands.push(Box::new(PolityUpdateLeaderCommand(polity.clone())));
+            }
+        }
+        for settlement in world.storages.get_storage::<Settlement>().ids.iter() {
+            if settlement.get().headman == self.0 {
+                commands.push(Box::new(SettlementUpdateHeadmanCommand(settlement.clone())));
+            }
+        }
+        commands.push(Box::new(KillCharacterCommand(self.0.clone())));
+        commands
     }
 }
 

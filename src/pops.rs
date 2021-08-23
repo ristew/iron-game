@@ -1,5 +1,5 @@
 use inflector::cases::titlecase::to_title_case;
-use rand::{Rng, distributions::Slice, random, thread_rng};
+use rand::{Rng, distributions::Slice, prelude::IteratorRandom, random, thread_rng};
 use rand_distr::Uniform;
 
 use crate::*;
@@ -209,13 +209,14 @@ pub struct Culture {
 }
 
 impl Culture {
-    pub fn generate_character(&self, sex: Sex, world: &mut World) -> CharacterId {
+    pub fn generate_character(&self, sex: Sex, age: isize, world: &mut World) -> CharacterId {
         world.insert(Character {
             id: None,
             name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
-            birthday: world.date.clone(),
+            birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
             sex,
-            health: 60.0,
+            health: dev_mean_sample(5.0, 60.0) as f32,
+            death: None,
         })
     }
 }
