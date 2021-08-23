@@ -122,6 +122,7 @@ impl InfoPanelBuilder for SettlementInfoBuilder {
             infotainer!(self.0, name),
             settlement_controller(self.0.clone()),
             self.0.info_container(|settlement, w| settlement.get().features.iter().map(|f| format!("{:?}", f)).collect::<Vec<String>>().join(", ")),
+            self.0.info_container(|settlement, w| settlement.get().headman.get().name.clone()),
             pop_list,
         ]);
     }

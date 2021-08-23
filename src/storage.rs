@@ -24,6 +24,7 @@ pub enum StorageType {
     Settlement,
     Language,
     Polity,
+    Character,
 }
 
 impl StorageType {
@@ -42,6 +43,8 @@ impl StorageType {
             Self::Language
         } else if TypeId::of::<T>() == TypeId::of::<Polity>() {
             Self::Polity
+        } else if TypeId::of::<T>() == TypeId::of::<Character>() {
+            Self::Character
         } else {
             panic!("could not match Id type to storage, {}", stringify! {T});
         }
@@ -227,6 +230,7 @@ impl Default for Storages {
         init_storage!(Religion);
         init_storage!(Language);
         init_storage!(Polity);
+        init_storage!(Character);
         Self { storages }
     }
 }

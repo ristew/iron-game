@@ -208,6 +208,18 @@ pub struct Culture {
     pub features: Vec<CultureFeature>,
 }
 
+impl Culture {
+    pub fn generate_character(&self, sex: Sex, world: &mut World) -> CharacterId {
+        world.insert(Character {
+            id: None,
+            name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
+            birthday: world.date.clone(),
+            sex,
+            health: 60.0,
+        })
+    }
+}
+
 #[iron_data]
 pub struct Religion {
     pub id: Option<ReligionId>,

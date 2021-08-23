@@ -116,12 +116,14 @@ pub fn create_test_world(world: &mut World) {
 }
 
 pub fn add_polity(world: &mut World, name: String, culture_id: CultureId, level: PolityLevel) -> PolityId {
+    let leader = culture_id.get().generate_character(Sex::Male, world);
     world.insert(Polity {
         id: None,
         name,
         primary_culture: culture_id.clone(),
         capital: None,
         level: PolityLevel::Tribe,
+        leader,
     })
 }
 
@@ -130,6 +132,11 @@ fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: Pr
 }
 pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId, size: isize) -> SettlementId {
     let sites = province_id.get().generate_sites(world, 3);
+    let leader = if polity_id.get().capital.is_none() {
+        polity_id.get().leader.clone()
+    } else {
+        culture_id.get().generate_character(Sex::Male, world)
+    };
 
     let settlement_id = world.insert_settlement(Settlement {
         id: None,
@@ -140,6 +147,7 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
         province: province_id.clone(),
         level: SettlementLevel::Village,
         controller: polity_id.clone(),
+        headman: leader.clone(),
     });
     let pop_id = world.insert(Pop {
         id: None,

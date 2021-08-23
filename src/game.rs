@@ -561,6 +561,7 @@ pub struct Polity {
     pub primary_culture: CultureId,
     pub capital: Option<SettlementId>,
     pub level: PolityLevel,
+    pub leader: CharacterId,
 }
 
 #[derive(Clone, Debug)]
@@ -634,6 +635,7 @@ pub struct Settlement {
     pub province: ProvinceId,
     pub level: SettlementLevel,
     pub controller: PolityId,
+    pub headman: CharacterId,
 }
 
 impl Settlement {
@@ -959,7 +961,7 @@ impl EventHandler<GameError> for MainState {
             .events
             .add(Box::new(MouseButtonDownEvent(point)));
         if !self.ui_system.click_obscured(point) {
-            self.world.events.add(Box::new(MouseButtonDownEvent(point)));
+            self.world.events.add(Rc::new(MouseButtonDownEvent(point)));
         }
     }
 
@@ -986,7 +988,7 @@ impl EventHandler<GameError> for MainState {
 
     fn mouse_wheel_event(&mut self, _ctx: &mut ggez::Context, _x: f32, y: f32) {
         if y != 0.0 {
-            self.world.events.add(Box::new(MouseWheelEvent(y)))
+            self.world.events.add(Rc::new(MouseWheelEvent(y)))
         }
     }
 
@@ -1011,7 +1013,7 @@ impl EventHandler<GameError> for MainState {
                 KeyCode::I => self.ui_system.set_info_panel(WorldInfoBuilder),
                 _ => {}
             };
-            self.world.events.add(Box::new(KeyDownEvent {
+            self.world.events.add(Rc::new(KeyDownEvent {
                 keycode,
                 keymods,
                 repeat,
@@ -1028,7 +1030,7 @@ impl EventHandler<GameError> for MainState {
     ) {
         self.world
             .events
-            .add(Box::new(KeyUpEvent { keycode, keymods }));
+            .add(Rc::new(KeyUpEvent { keycode, keymods }));
         self.world.events.set_key_up(keycode);
     }
 

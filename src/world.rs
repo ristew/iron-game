@@ -44,6 +44,10 @@ impl Date {
     pub fn day_of_month(&self) -> usize {
         self.day % 30 + 1
     }
+
+    pub fn age(&self, now: Date) -> usize {
+        (self.day - now.day) / 360
+    }
 }
 
 pub fn parse_path(path: &'static str) {

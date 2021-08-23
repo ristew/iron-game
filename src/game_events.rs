@@ -1,4 +1,6 @@
+use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 use ggez::event::KeyCode;
 
@@ -14,6 +16,7 @@ pub enum EventKind {
     PopStarve,
     MigrationDone,
     PopDestroyed,
+    CharacterDied,
 }
 
 pub trait Event {
@@ -27,7 +30,7 @@ pub trait Event {
 // }
 
 // impl EventCommandMapper {
-//     pub fn map_event(&self, event: Box<dyn Event>) -> Vec<Box<dyn Command>> {
+//     pub fn map_event(&self, event: Rc<dyn Event>) -> Vec<Box<dyn Command>> {
 //         if let Some(event_mapper) = self.event_mappers.get(&event.kind()) {
 //             event_mapper.map_event(event)
 //         } else {
@@ -36,10 +39,107 @@ pub trait Event {
 //     }
 // }
 
+pub struct EventChannel {
+    pub events: RefCell<Vec<Rc<dyn Event>>>,
+}
+
+impl EventChannel {
+    pub fn new() -> Self {
+        Self {
+            events: RefCell::new(Vec::new()),
+        }
+    }
+}
+
+pub struct EventIdChannels<Id> where Id: IronId {
+    channels: HashMap<Id, Vec<Rc<dyn Event>>>,
+}
+
+impl<Id> EventIdChannels<Id> where Id: IronId + Eq + Hash + Clone {
+    pub fn new() -> Self {
+        Self {
+            channels: HashMap::new(),
+        }
+    }
+
+    pub fn publish(&mut self, id: Id, event: Rc<dyn Event>) {
+        if !self.channels.contains_key(&id) {
+            self.channels.insert(id, vec![event]);
+        } else {
+            self.channels.get_mut(&id).unwrap().push(event);
+        }
+    }
+
+    pub fn iter(&mut self, id: Id) -> impl Iterator<Item = &Rc<dyn Event>> {
+        if !self.channels.contains_key(&id) {
+            self.channels.insert(id.clone(), vec![]);
+        }
+
+        self.channels.get(&id).unwrap().iter()
+    }
+
+    pub fn clear(&mut self) {
+
+    }
+}
+
+pub struct EventChannels {
+    event_id_channels: HashMap<TypeId, Box<dyn Any>>,
+}
+
+impl EventChannels {
+    pub fn get_by_id<Id>(&self) -> &EventIdChannels<Id> where Id: IronId + 'static {
+        self.event_id_channels
+            .get(&TypeId::of::<Id>())
+            .unwrap()
+            .downcast_ref::<EventIdChannels<Id>>()
+            .unwrap()
+    }
+
+    pub fn get_by_id_mut<Id>(&mut self) -> &mut EventIdChannels<Id> where Id: IronId + 'static {
+        self.event_id_channels
+            .get_mut(&TypeId::of::<Id>())
+            .unwrap()
+            .downcast_mut::<EventIdChannels<Id>>()
+            .unwrap()
+    }
+
+    pub fn iter<Id>(&mut self, id: Id) -> impl Iterator<Item = &Rc<dyn Event>> where Id: IronId + Eq + Hash + Clone + 'static {
+        self.get_by_id_mut::<Id>().iter(id)
+    }
+
+    pub fn publish<Id>(&mut self, id: Id, event: Rc<dyn Event>) where Id: IronId + Eq + Hash + Clone + 'static {
+        self.get_by_id_mut::<Id>().publish(id, event);
+    }
+}
+
+impl Default for EventChannels {
+    fn default() -> Self {
+        let mut eid_channels: HashMap<TypeId, Box<dyn Any>> = HashMap::new();
+        macro_rules! init_eid_channel {
+            ( $typ:ident ) => {
+                eid_channels.insert(
+                    TypeId::of::<$typ>(),
+                    Box::new(EventIdChannels::<$typ>::new()),
+                );
+            }
+        }
+        init_eid_channel!(ProvinceId);
+        init_eid_channel!(PopId);
+        init_eid_channel!(SettlementId);
+        init_eid_channel!(CultureId);
+        init_eid_channel!(ReligionId);
+        init_eid_channel!(LanguageId);
+        init_eid_channel!(PolityId);
+        init_eid_channel!(CharacterId);
+        Self { event_id_channels: eid_channels }
+    }
+}
+
 pub struct Events {
     // pub event_command_mapper: EventCommandMapper, //
-    pub events:RefCell<Vec<Box<dyn Event>>>,
-    pub deferred: RefCell<HashMap<usize, Vec<Box<dyn Event>>>>,
+    pub events:RefCell<Vec<Rc<dyn Event>>>,
+    pub deferred: RefCell<HashMap<usize, Vec<Rc<dyn Event>>>>,
     pub down_keys: HashSet<KeyCode>,
 }
 
@@ -55,15 +155,15 @@ impl Default for Events {
 }
 
 impl Events {
-    pub fn add(&self, event: Box<dyn Event>) {
+    pub fn add(&self, event: Rc<dyn Event>) {
         self.events.borrow_mut().push(event);
     }
 
-    pub fn add_list(&self, events: Vec<Box<dyn Event>>) {
+    pub fn add_list(&self, events: Vec<Rc<dyn Event>>) {
         self.events.borrow_mut().extend(events.into_iter());
     }
 
-    pub fn add_deferred(&self, event: Box<dyn Event>, date: usize) {
+    pub fn add_deferred(&self, event: Rc<dyn Event>, date: usize) {
         if self.deferred.borrow().contains_key(&date) {
             self.deferred.borrow_mut().get_mut(&date).unwrap().push(event);
         } else {
@@ -72,7 +172,7 @@ impl Events {
 
     }
 
-    pub fn get_deferred(&self, date: Date) -> Vec<Box<dyn Event>> {
+    pub fn get_deferred(&self, date: Date) -> Vec<Rc<dyn Event>> {
         if let Some(events) = self.deferred.borrow_mut().remove(&date.day) {
             events
         } else {
@@ -94,7 +194,7 @@ impl Events {
 
     pub fn spawn_held_events(&self) {
         for down_key in self.down_keys.iter() {
-            self.add(Box::new(KeyHeldEvent { keycode: *down_key }))
+            self.add(Rc::new(KeyHeldEvent { keycode: *down_key }))
         }
     }
 
@@ -237,6 +337,18 @@ impl Event for MigrationDoneEvent {
         }
 
 
+    }
+}
+
+pub struct CharacterDiedEvent(pub CharacterId);
+
+impl Event for CharacterDiedEvent {
+    fn kind(&self) -> EventKind {
+        todo!()
+    }
+
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        todo!()
     }
 }
 

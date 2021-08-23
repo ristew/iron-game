@@ -26,7 +26,7 @@ impl Command for PopGrowthCommand {
         self.pop.get_mut().die(self.deaths);
         if self.pop.get().size <= 0 {
             // world.pops.remove
-            world.events.add(Box::new(PopDestroyedEvent(self.pop.clone())));
+            world.events.add(Rc::new(PopDestroyedEvent(self.pop.clone())));
         }
     }
 }
@@ -135,7 +135,7 @@ impl Command for PopEatCommand {
             }
 
             if dead_kids > 0 || dead_adults > 0 {
-                world.events.add(Box::new(PopStarveEvent {
+                world.events.add(Rc::new(PopStarveEvent {
                     pop: self.0.clone(),
                     amount: dead_adults,
                     children: dead_kids,
@@ -144,10 +144,18 @@ impl Command for PopEatCommand {
         }
 
         if pop.get().size == 0 {
-            world.events.add(Box::new(PopDestroyedEvent(pop.clone())));
+            world.events.add(Rc::new(PopDestroyedEvent(pop.clone())));
         }
 
         pop.get_mut().satiety = total_satiety;
+    }
+}
+
+pub struct KillCharacterCommand(pub CharacterId);
+
+impl Command for KillCharacterCommand {
+    fn run(&self, world: &mut World) {
+        world.remove(&self.0);
     }
 }
 
@@ -227,7 +235,7 @@ impl Command for PopSeekMigrationCommand {
                                 date: world.date.day + 60,
                                 settlement: Some(settlement.clone()),
                             });
-                            world.events.add_deferred(Box::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
+                            world.events.add_deferred(Rc::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
                             return;
                         }
                     }
@@ -241,7 +249,7 @@ impl Command for PopSeekMigrationCommand {
                         date: world.date.day + 60,
                         settlement: None,
                     });
-                    world.events.add_deferred(Box::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
+                    world.events.add_deferred(Rc::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
                 }
             }
         }
