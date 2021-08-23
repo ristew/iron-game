@@ -22,9 +22,11 @@ pub struct PopGrowthCommand {
 impl Command for PopGrowthCommand {
     fn run(&self, world: &mut World) {
         let adults = self.pop.get_mut().kid_buffer.spawn(self.babies) as isize;
-        self.pop.get_mut().size += adults - self.deaths;
+        self.pop.get_mut().size += adults;
+        self.pop.get_mut().die(self.deaths);
         if self.pop.get().size <= 0 {
             // world.pops.remove
+            world.events.add(Box::new(PopDestroyedEvent(self.pop.clone())));
         }
     }
 }
@@ -215,6 +217,19 @@ impl Command for PopSeekMigrationCommand {
                     target_value -= 1.0;
                     if settlement.get().primary_culture != self.pop.get().culture {
                         target_value -= 2.0;
+                    } else {
+                        let settlement_carrying_capacity = settlement.get().carrying_capacity(world);
+                        if (settlement.get().population(world) as f32) < settlement_carrying_capacity / 4.0 {
+                            let size = (self.pop.get().size / 4).min((settlement_carrying_capacity / 4.0).round() as isize);
+                            self.pop.get_mut().migration_status = Some(MigrationStatus {
+                                migrating: size,
+                                dest: target_province_id.clone(),
+                                date: world.date.day + 60,
+                                settlement: Some(settlement.clone()),
+                            });
+                            world.events.add_deferred(Box::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
+                            return;
+                        }
                     }
                 }
                 if individual_event(logistic(target_value)) {
@@ -224,6 +239,7 @@ impl Command for PopSeekMigrationCommand {
                         migrating: size,
                         dest: target_province_id.clone(),
                         date: world.date.day + 60,
+                        settlement: None,
                     });
                     world.events.add_deferred(Box::new(MigrationDoneEvent(self.pop.clone())), world.date.day + 60);
                 }
@@ -236,12 +252,26 @@ pub struct PopMigrateCommand {
     pub pop: PopId,
     pub dest: ProvinceId,
     pub migrating: isize,
+    pub settlement: Option<SettlementId>,
 }
 
 impl Command for PopMigrateCommand {
     fn run(&self, world: &mut World) {
         // println!("finally migrate {:?}", self.pop);
-        add_settlement(world, self.pop.get().culture.clone(), self.dest.clone(), self.pop.get().polity.clone(), self.migrating);
+        if let Some(settlement_id) = self.settlement.clone() {
+            settlement_id.get_mut().accept_migrants(world, self.pop.clone(), self.migrating);
+        } else {
+            add_settlement(world, self.pop.get().culture.clone(), self.dest.clone(), self.pop.get().polity.clone(), self.migrating);
+        }
         self.pop.get_mut().size -= self.migrating;
+    }
+}
+
+pub struct UpdateWorldPopulation;
+
+impl Command for UpdateWorldPopulation {
+    fn run(&self, world: &mut World) {
+        let new_total = world.storages.get_storage::<Pop>().ids.iter().fold(0, |acc, pop| acc + pop.get().size);
+        world.population = new_total;
     }
 }

@@ -1,4 +1,5 @@
 use crate::*;
+use crate::ui::events::WorldInfoBuilder;
 use ggez::{
     event::{EventHandler, KeyCode},
     graphics::{clear, present, set_screen_coordinates, Color, Rect},
@@ -665,6 +666,30 @@ impl Settlement {
     pub fn has_feature(&self, feature: SettlementFeature) -> bool {
         self.features.contains(&feature)
     }
+
+    pub fn accept_migrants(&mut self, world: &mut World, pop: PopId, amount: isize) {
+        println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
+        if let Some(dpop) = self.pops.iter().find(|p| p.get().culture == pop.get().culture) {
+            dpop.get_mut().size += amount;
+        } else {
+            let pop_id = world.insert(Pop {
+                id: None,
+                size: amount,
+                farmed_good: Some(Wheat),
+                culture: pop.get().culture.clone(),
+                settlement: self.id().clone(),
+                province: self.province.clone(),
+                satiety: Satiety {
+                    base: 0.0,
+                    luxury: 0.0,
+                },
+                kid_buffer: KidBuffer::new(),
+                owned_goods: GoodStorage(HashMap::new()),
+                migration_status: None,
+                polity: self.controller.clone(),
+            });
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -674,6 +699,11 @@ impl KidBuffer {
     pub fn new() -> Self {
         Self(VecDeque::new())
     }
+
+    pub fn size(&self) -> isize {
+        self.0.iter().fold(0, |acc, e| acc + e)
+    }
+
     pub fn spawn(&mut self, babies: isize) -> isize {
         // println!("spawn babies {}", babies);
         self.0.push_front(babies);
@@ -978,6 +1008,7 @@ impl EventHandler<GameError> for MainState {
                 KeyCode::LBracket => self.target_speed = (self.target_speed * 2).min(256),
                 KeyCode::Space => self.target_speed = -self.target_speed,
                 KeyCode::Back => self.ui_system.info_panel_back(),
+                KeyCode::I => self.ui_system.set_info_panel(WorldInfoBuilder),
                 _ => {}
             };
             self.world.events.add(Box::new(KeyDownEvent {

@@ -269,6 +269,45 @@ impl DateContainer {
     }
 }
 
+pub struct WorldInfoContainer {
+    pub mapping: Box<dyn Fn(&World) -> String>,
+    pub inner: TextContainer,
+}
+
+impl WorldInfoContainer {
+
+    pub fn new<F>(mapping: F) -> Rc<RefCell<Self>>
+    where
+        F: Fn(&World) -> String + 'static,
+    {
+        Rc::new(RefCell::new(Self {
+            mapping: Box::new(mapping),
+            inner: TextContainer::empty(),
+        }))
+    }
+}
+
+impl Container for WorldInfoContainer {
+    fn size(&self) -> Point2 {
+        self.inner.size()
+    }
+
+    fn render(
+        &self,
+        ctx: &mut Context,
+        ui_system: &UiSystem,
+        dest: Point2,
+    ) -> Vec<Box<dyn UiCommand>> {
+        self.inner.render(ctx, ui_system, dest)
+    }
+
+    fn layout(&mut self, ctx: &mut Context, constraints: Constraints, world: &World) {
+        self.inner.text = new_text((*self.mapping)(world));
+
+        self.inner.layout(ctx, constraints, world)
+    }
+}
+
 pub struct InfoContainer<T>
 where
     T: IronData,

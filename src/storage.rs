@@ -79,13 +79,14 @@ where
     id_ctr: usize,
     pub rcs: Vec<Rc<RefCell<T>>>,
     pub id_map: HashMap<usize, Weak<RefCell<T>>>,
+    pub ids: Vec<Id>,
     _fake: PhantomData<Id>,
 }
 
 impl<T, Id> ObjectStorage<T, Id>
 where
     T: IronData<IdType = Id>,
-    Id: IronId<Target = T>,
+    Id: IronId<Target = T> + Clone,
 {
     pub fn has_id(&self, id: &Id) -> bool {
         self.id_map.contains_key(&id.num())
@@ -95,7 +96,7 @@ where
 impl<T, Id> Storage for ObjectStorage<T, Id>
 where
     T: IronData<IdType = Id>,
-    Id: IronId<Target = T> + Debug,
+    Id: IronId<Target = T> + Debug + Clone,
 {
     type Object = T;
     type Id = Id;
@@ -106,11 +107,12 @@ where
     fn insert(&mut self, item: Self::Object) -> Self::Id {
         let rc = Rc::new(RefCell::new(item));
         let id = Self::Id::new(self.get_id(), IronIdInner(rc.clone()));
-        rc.borrow_mut().set_id(id);
+        rc.borrow_mut().set_id(id.clone());
 
         self.rcs.push(rc.clone());
         self.id_map
             .insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
+        self.ids.push(id.clone());
         let x = (*rc).borrow();
         x.id()
     }
@@ -128,6 +130,12 @@ where
         {
             // println!("removed item: {:?}", removed.borrow().id());
         }
+        for removed in self
+            .ids
+            .drain_filter(|oid| oid.num() == id.num())
+        {
+            // println!("removed item: {:?}", removed.borrow().id());
+        }
     }
 }
 
@@ -139,6 +147,7 @@ where
         Self {
             id_ctr: 0,
             rcs: Vec::new(),
+            ids: Vec::new(),
             id_map: HashMap::new(),
             _fake: Default::default(),
         }

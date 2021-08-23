@@ -10,6 +10,7 @@ pub struct MigrationStatus {
     pub migrating: isize,
     pub dest: ProvinceId,
     pub date: usize,
+    pub settlement: Option<SettlementId>,
 }
 
 #[iron_data]
@@ -37,7 +38,7 @@ impl Pop {
         let before = self.size;
         self.size = (self.size - amount).max(0);
 
-        // println!("size: {}", self.size);
+        // println!("before: {}, size: {}", before, self.size);
         before - self.size
     }
 
@@ -59,7 +60,7 @@ impl Pop {
                 SettlementFeature::Infertile => -10.0,
             };
         }
-        println!("evaluate site {:?} score {}", site, score);
+        // println!("evaluate site {:?} score {}", site, score);
 
         score
     }

@@ -204,7 +204,7 @@ impl Event for PopStarveEvent {
     }
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
-        // println!("pop starve: {:?}, amount: {}, kids: {}", self.pop, self.amount, self.children);
+        // println!("pop starve: {:?}: {}/{}, amount: {}, kids: {}", world.date, self.pop.get().size, self.pop.get().settlement.get().carrying_capacity(world), self.amount, self.children);
         vec![Box::new(PopSeekMigrationCommand {
             pop: self.pop.clone(),
             pressure: (self.amount + self.children / 2) as f32,
@@ -228,6 +228,7 @@ impl Event for MigrationDoneEvent {
                     pop: self.0.clone(),
                     dest: migration_status.dest.clone(),
                     migrating: migration_status.migrating.min(self.0.get().size),
+                    settlement: migration_status.settlement.clone(),
                 })]
             }
 

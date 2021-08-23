@@ -65,13 +65,21 @@ fn pop_info(pop_id: &PopId, ui_system: &mut UiSystem) -> ButtonUiContainerPtr {
 
     info_list
         .borrow_mut()
-        .add_children(vec![pop_id.info_container(|pop, w| {
-            format!(
-                "{} of {}",
-                pop.get().size,
-                pop.get().culture.get().name
-            )
-        })]);
+        .add_children(vec![
+            pop_id.info_container(|pop, w| {
+                format!(
+                    "{} of {}",
+                    pop.get().size,
+                    pop.get().culture.get().name
+                )
+            }),
+            pop_id.info_container(|pop, w| {
+                format!(
+                    "{} kids",
+                    pop.get().kid_buffer.size(),
+                )
+            })
+        ]);
 
     let button_container = ButtonUiContainer::new_rc(info_list, button_id);
     // ui_system.add_button(Button::new(button_id, button_container.clone(), |world, sys| {
@@ -101,6 +109,7 @@ fn pop_list(
 fn settlement_controller(id: SettlementId) -> InfoContainerPtr<Settlement> {
     id.info_container(|settlement, w| format!("Controlled by {}", settlement.get().controller.get().name))
 }
+
 
 pub struct SettlementInfoBuilder(SettlementId);
 
@@ -185,6 +194,28 @@ impl UiEvent for CommandEvent {
         Some(self.0.clone())
     }
 }
+
+pub struct WorldInfoBuilder;
+
+impl InfoPanelBuilder for WorldInfoBuilder {
+    fn build(&self, world: &World, ui_system: &mut UiSystem) {
+        ui_system.info_panel.clear();
+        ui_system.info_panel.add_children(vec![
+            DateContainer::new(),
+            WorldInfoContainer::new(|world| format!("global population: {}", world.population))
+        ]);
+    }
+}
+
+pub struct ShowWorldInfo;
+
+impl UiCommand for ShowWorldInfo {
+    fn run(&self, world: &World, ui_system: &mut UiSystem) {
+        ui_system.set_info_panel(WorldInfoBuilder);
+    }
+}
+
+
 
 struct ProvinceInfoBuilder(ProvinceId);
 

@@ -64,6 +64,7 @@ pub struct World {
     pub camera: Camera,
     pub events: Events,
     pub selected_province: Option<ProvinceId>,
+    pub population: isize,
 }
 
 impl World {
@@ -132,6 +133,7 @@ impl World {
             camera: Default::default(),
             events: Default::default(),
             selected_province: Default::default(),
+            population: 0,
             // ui_system: Default::default(),
         }
     }
@@ -152,13 +154,14 @@ pub fn pops_yearly_growth(world: &World) {
         // println!("pop size: {}", pop_rc.borrow().size);
         let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
         let deaths = positive_isample(2, pop_rc.borrow().size / 50);
-        println!("babies {} deaths {} size {}", babies, deaths, pop_rc.borrow().size);
+        // println!("babies {} deaths {} size {}", babies, deaths, pop_rc.borrow().size);
         world.add_command(Box::new(PopGrowthCommand {
             babies,
             deaths,
             pop: pop_rc.borrow().id().clone(),
         }));
     }
+    world.add_command(Box::new(UpdateWorldPopulation));
 }
 
 pub fn harvest_provinces(world: &World) {
