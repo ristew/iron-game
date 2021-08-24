@@ -575,6 +575,12 @@ pub struct Site {
     pub features: HashSet<SettlementFeature>,
 }
 
+pub trait Featured<T> where T: Eq + Hash + Sized {
+    fn has_feature(&self, feature: T) -> bool;
+    fn add_feature(&mut self, feature: T);
+    fn remove_feature(&mut self, feature: T);
+}
+
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub enum SettlementFeature {
     Hilltop,
@@ -645,6 +651,20 @@ pub struct Settlement {
     pub successor_law: SuccessorLaw,
 }
 
+impl Featured<SettlementFeature> for Settlement {
+    fn has_feature(&self, feature: SettlementFeature) -> bool {
+        self.features.contains(&feature)
+    }
+
+    fn add_feature(&mut self, feature: SettlementFeature) {
+        self.features.insert(feature);
+    }
+
+    fn remove_feature(&mut self, feature: SettlementFeature) {
+        self.features.remove(&feature);
+    }
+}
+
 impl Settlement {
     pub fn factor(&self, world: &World, ftype: FactorType, base: f32) -> f32 {
         let mut factors = vec![
@@ -670,10 +690,6 @@ impl Settlement {
     // rating is a measure of how attractive a settlement is
     pub fn rating(&self, world: &World) -> f32 {
         self.factor(world, FactorType::SettlementRating, self.level.rating())
-    }
-
-    pub fn has_feature(&self, feature: SettlementFeature) -> bool {
-        self.features.contains(&feature)
     }
 
     pub fn accept_migrants(&mut self, world: &mut World, pop: PopId, amount: isize) {

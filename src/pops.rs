@@ -3,7 +3,7 @@ use rand::{Rng, distributions::Slice, prelude::IteratorRandom, random, thread_rn
 use rand_distr::Uniform;
 
 use crate::*;
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
 
 #[derive(Clone, Debug)]
 pub struct MigrationStatus {
@@ -217,6 +217,7 @@ impl Culture {
             sex,
             health: dev_mean_sample(5.0, 60.0) as f32,
             death: None,
+            features: HashSet::new(),
         })
     }
 }

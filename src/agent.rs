@@ -1,9 +1,17 @@
+use std::collections::HashSet;
+
 use crate::*;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Sex {
     Male,
     Female,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum CharacterFeature {
+    Coward,
+    Idiot,
 }
 
 #[iron_data]
@@ -14,6 +22,21 @@ pub struct Character {
     pub sex: Sex,
     pub health: f32,
     pub death: Option<Date>,
+    pub features: HashSet<CharacterFeature>,
+}
+
+impl Featured<CharacterFeature> for Character {
+    fn has_feature(&self, feature: CharacterFeature) -> bool {
+        self.features.contains(&feature)
+    }
+
+    fn add_feature(&mut self, feature: CharacterFeature) {
+        self.features.insert(feature);
+    }
+
+    fn remove_feature(&mut self, feature: CharacterFeature) {
+        self.features.remove(&feature);
+    }
 }
 
 impl Character {
