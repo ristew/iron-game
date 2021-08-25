@@ -5,6 +5,7 @@ use ggez::{
     graphics::{clear, present, set_screen_coordinates, Color, Rect},
     timer, Context, GameError,
 };
+use hecs::{Entity, EntityRef};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, random, thread_rng};
 use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, time::Duration};
@@ -174,6 +175,12 @@ impl Display for Terrain {
     }
 }
 
+impl Default for Terrain {
+    fn default() -> Self {
+        Self::Hills,
+    }
+}
+
 impl Factored for Terrain {
     fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
         match factor {
@@ -239,6 +246,12 @@ impl Factored for Climate {
             }),
             _ => None,
         }
+    }
+}
+
+impl Default for Climate {
+    fn default() -> Self {
+        Self::Mild
     }
 }
 
@@ -402,25 +415,29 @@ pub enum ProvinceFeature {
     NaturalHarbor,
 }
 
-use SettlementFeature::*;
-#[iron_data]
-pub struct Province {
-    pub id: Option<ProvinceId>,
-    pub settlements: Vec<SettlementId>,
+#[derive(Debug, Default, Clone)]
+pub struct Settlements(pub Vec<Settlement>);
+#[derive(Debug, Default, Clone)]
+pub struct Geography {
     pub terrain: Terrain,
     pub climate: Climate,
-    pub coordinate: Coordinate,
-    pub features: HashSet<ProvinceFeature>,
-    pub harvest_month: usize,
-    pub controller: Option<PolityId>,
     pub coastal: bool,
+    pub harvest_month: usize,
 }
+#[derive(Debug, Default, Clone)]
+pub struct ProvinceFeatures(pub HashSet<ProvinceFeature>);
+#[derive(Debug, Clone)]
+pub struct Controller(pub Entity);
+
+#[derive(IronData, Debug, Clone, Copy)]
+pub struct ProvinceRef(pub Entity);
+
 
 impl Province {
     pub fn population(&self, world: &World) -> isize {
         let mut total_pop = 0;
-        for settlement_id in self.settlements.iter() {
-            total_pop += settlement_id.get().population(world);
+        for settlement in world.hecs.get::<Settlements>(self.0).iter() {
+            total_pop += settlement.population(world);
         }
         total_pop
     }
@@ -447,6 +464,7 @@ impl Province {
     }
 
     fn settlement_feature_map(&self, world: &World) -> FeatureMap<SettlementFeature> {
+        use SettlementFeature::*;
         let mut fmap: FeatureMap<SettlementFeature> = FeatureMap::new();
         if self.coastal {
             fmap.add(Oceanside, match self.terrain {
@@ -504,6 +522,7 @@ impl Province {
     }
 
     pub fn generate_site(&self, world: &World) -> Site {
+        use SettlementFeature::*;
         // let occupied_settlements = self.settlements.iter().map(|sid| sid.get());
         let feature_map  = self.settlement_feature_map(world);
         let mut features: HashSet<SettlementFeature> = HashSet::new();
@@ -555,20 +574,18 @@ pub enum PolityLevel {
 }
 
 pub enum SuccessorLaw {
-    Inheritance(CharacterId),
+    Inheritance(Character),
     Election,
 }
 
-#[iron_data]
+pub struct PolityRef<'a>(pub EntityRef<'a>);
+
 pub struct Polity {
-    pub id: Option<PolityId>,
     pub name: String,
-    pub primary_culture: CultureId,
-    pub capital: Option<SettlementId>,
-    pub level: PolityLevel,
-    pub leader: CharacterId,
-    pub successor_law: SuccessorLaw,
 }
+
+pub struct Capital(pub Settlement);
+pub struct Leader(pub Character);
 
 #[derive(Clone, Debug)]
 pub struct Site {
@@ -581,215 +598,14 @@ pub trait Featured<T> where T: Eq + Hash + Sized {
     fn remove_feature(&mut self, feature: T);
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
-pub enum SettlementFeature {
-    Hilltop,
-    Riverside,
-    Oceanside,
-    Harbor,
-    Mines(GoodType),
-    Fertile,
-    DominantCrop(GoodType),
-    Infertile,
-}
 
-impl Factored for SettlementFeature {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
-        match factor {
-            FactorType::CarryingCapacity => match *self {
-                SettlementFeature::Riverside => Some(Factor::factor(1.5)),
-                SettlementFeature::Fertile => Some(Factor::factor(1.4)),
-                SettlementFeature::Infertile => Some(Factor::factor(0.5)),
-                _ => None,
-            },
-            FactorType::SettlementRating => match *self {
-                SettlementFeature::Hilltop => Some(Factor::factor(1.5)),
-                SettlementFeature::Riverside => Some(Factor::factor(1.5)),
-                SettlementFeature::Oceanside => Some(Factor::factor(1.1)),
-                SettlementFeature::Harbor => Some(Factor::factor(1.5)),
-                SettlementFeature::Mines(_) => Some(Factor::factor(1.3)),
-                SettlementFeature::Fertile => Some(Factor::factor(1.4)),
-                SettlementFeature::Infertile => Some(Factor::factor(0.5)),
-                _ => None,
-            },
-        }
-    }
-}
+pub struct Pops(pub Vec<Pop>);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum SettlementLevel {
-    Hamlet,
-    Village,
-    Town,
-    City,
-    Metropolis,
-}
-
-impl SettlementLevel {
-    pub fn rating(&self) -> f32 {
-        match *self {
-            SettlementLevel::Hamlet => 5.0,
-            SettlementLevel::Village => 10.0,
-            SettlementLevel::Town => 20.0,
-            SettlementLevel::City => 40.0,
-            SettlementLevel::Metropolis => 80.0,
-        }
-    }
-}
-
-#[iron_data]
-pub struct Settlement {
-    pub id: Option<SettlementId>,
-    pub name: String,
-    pub pops: Vec<PopId>,
-    pub features: HashSet<SettlementFeature>,
-    pub primary_culture: CultureId,
-    pub province: ProvinceId,
-    pub level: SettlementLevel,
-    pub controller: PolityId,
-    pub headman: CharacterId,
+pub struct Ruler {
+    pub ruler: Character,
     pub successor_law: SuccessorLaw,
 }
 
-impl Featured<SettlementFeature> for Settlement {
-    fn has_feature(&self, feature: SettlementFeature) -> bool {
-        self.features.contains(&feature)
-    }
-
-    fn add_feature(&mut self, feature: SettlementFeature) {
-        self.features.insert(feature);
-    }
-
-    fn remove_feature(&mut self, feature: SettlementFeature) {
-        self.features.remove(&feature);
-    }
-}
-
-impl Settlement {
-    pub fn factor(&self, world: &World, ftype: FactorType, base: f32) -> f32 {
-        let mut factors = vec![
-            self.province.get().terrain.factor(world, ftype),
-            self.province.get().climate.factor(world, ftype),
-        ];
-        factors.extend(self.features.iter().map(|f| f.factor(world, ftype)));
-        apply_maybe_factors(base, factors)
-    }
-
-    pub fn carrying_capacity(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::CarryingCapacity, 100.0)
-    }
-
-    pub fn population(&self, world: &World) -> isize {
-        let mut total_pop = 0;
-        for pop_id in self.pops.iter() {
-            total_pop += pop_id.get().size;
-        }
-        total_pop
-    }
-
-    // rating is a measure of how attractive a settlement is
-    pub fn rating(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::SettlementRating, self.level.rating())
-    }
-
-    pub fn accept_migrants(&mut self, world: &mut World, pop: PopId, amount: isize) {
-        println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
-        if let Some(dpop) = self.pops.iter().find(|p| p.get().culture == pop.get().culture) {
-            dpop.get_mut().size += amount;
-        } else {
-            let pop_id = world.insert(Pop {
-                id: None,
-                size: amount,
-                farmed_good: Some(Wheat),
-                culture: pop.get().culture.clone(),
-                settlement: self.id().clone(),
-                province: self.province.clone(),
-                satiety: Satiety {
-                    base: 0.0,
-                    luxury: 0.0,
-                },
-                kid_buffer: KidBuffer::new(),
-                owned_goods: GoodStorage(HashMap::new()),
-                migration_status: None,
-                polity: self.controller.clone(),
-            });
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct KidBuffer(VecDeque<isize>);
-
-impl KidBuffer {
-    pub fn new() -> Self {
-        Self(VecDeque::new())
-    }
-
-    pub fn size(&self) -> isize {
-        self.0.iter().fold(0, |acc, e| acc + e)
-    }
-
-    pub fn spawn(&mut self, babies: isize) -> isize {
-        // println!("spawn babies {}", babies);
-        self.0.push_front(babies);
-        // println!("{:?}", self);
-        if self.0.len() > 12 {
-            self.0.pop_back().unwrap()
-        } else {
-            babies
-        }
-    }
-
-    pub fn starve(&mut self) -> isize {
-        let cohort = sample(3.0).abs().min(12.0) as usize;
-        if self.0.len() > cohort {
-            let cohort_size = self.0[cohort];
-            let dead_kids = positive_isample(cohort_size / 20 + 2, cohort_size / 5 + 1);
-            // println!("cohort {}, size {}, dead {}", cohort, cohort_size, dead_kids);
-            self.0[cohort] = (cohort_size - dead_kids).max(0);
-            cohort_size - self.0[cohort]
-        } else {
-            0
-        }
-    }
-}
-
-#[derive(PartialEq)]
-pub struct Satiety {
-    pub base: f32,
-    pub luxury: f32,
-}
-
-impl std::ops::Add for Satiety {
-    type Output = Satiety;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Satiety {
-            base: self.base + rhs.base,
-            luxury: self.luxury + rhs.luxury,
-        }
-    }
-}
-
-impl std::ops::AddAssign for Satiety {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = Satiety {
-            base: self.base + rhs.base,
-            luxury: self.luxury + rhs.luxury,
-        };
-    }
-}
-
-impl std::ops::Mul<Satiety> for f32 {
-    type Output = Satiety;
-
-    fn mul(self, rhs: Satiety) -> Self::Output {
-        Satiety {
-            base: rhs.base * self,
-            luxury: rhs.luxury * self,
-        }
-    }
-}
 
 pub struct GoodStorage(pub HashMap<GoodType, f32>);
 
@@ -894,11 +710,7 @@ pub trait IronId {
 }
 
 pub trait IronData {
-    type DataType;
-    type IdType: IronId<Target = Self> + Debug + Clone;
-
-    fn id(&self) -> Self::IdType;
-    fn set_id(&mut self, id: Self::IdType);
+    fn id(&self) -> Entity;
 }
 
 pub struct MainState {

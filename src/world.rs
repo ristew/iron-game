@@ -69,6 +69,7 @@ pub struct World {
     pub events: Events,
     pub selected_province: Option<ProvinceId>,
     pub population: isize,
+    pub hecs: hecs::World,
 }
 
 impl World {

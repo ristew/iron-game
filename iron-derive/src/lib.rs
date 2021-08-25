@@ -94,16 +94,8 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl #impl_generics crate::game::IronData for #name #ty_generics #where_clause {
-            type DataType = #name;
-            type IdType = #name_id;
-            // type StorageType = crate::storage::Storage<Object = #name>;
-
-            fn id(&self) -> Self::IdType {
-                self.id.clone().unwrap()
-            }
-
-            fn set_id(&mut self, id: Self::IdType) {
-                self.id = Some(id.clone());
+            fn id(&self) -> hecs::Entity {
+                self.0
             }
         }
     };

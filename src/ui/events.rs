@@ -31,7 +31,7 @@ pub trait UiCommand {
 
 pub type InfoContainerPtr<T> = Rc<RefCell<InfoContainer<T>>>;
 
-fn province_coordinate(id: ProvinceId) -> InfoContainerPtr<Province> {
+fn province_coordinate(id: Province) -> InfoContainerPtr<Province> {
     id.info_container(|province, _| format!("{:?}", province.get().coordinate))
 }
 

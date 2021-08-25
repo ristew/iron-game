@@ -115,18 +115,18 @@ pub fn create_test_world(world: &mut World) {
     }
 }
 
-pub fn add_polity(world: &mut World, name: String, culture_id: CultureId, level: PolityLevel) -> PolityId {
+pub fn add_polity(world: &mut World, name: String, culture: Culture, level: PolityLevel) -> PolityId {
     let age = positive_isample(8, 45);
-    let leader = culture_id.get().generate_character(Sex::Male, age, world);
-    world.insert(Polity {
-        id: None,
-        name,
-        primary_culture: culture_id.clone(),
-        capital: None,
-        level: PolityLevel::Tribe,
-        leader,
-        successor_law: SuccessorLaw::Election,
-    })
+    let leader = generate_character(culture, Sex::Male, age, world);
+    let entity = world.hecs.spawn((
+        PolityInfo {
+            name,
+        },
+        Leader(leader),
+        SuccessorLaw::Election,
+        level,
+        culture,
+    ))
 }
 
 fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId) -> SettlementId {

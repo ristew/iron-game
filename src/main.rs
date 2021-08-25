@@ -22,6 +22,7 @@ pub mod ui;
 pub mod world;
 pub mod worldgen;
 pub mod agent;
+pub mod settlement;
 
 pub use commands::*;
 pub use game_events::*;

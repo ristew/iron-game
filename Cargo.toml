@@ -21,5 +21,6 @@ strum = { version = "0.21", features = ["derive"] }
 rayon = "1.5.1"
 Inflector = "0.11.4"
 noise = "0.7.0"
+hecs = "0.6.2"
 
 [workspace]

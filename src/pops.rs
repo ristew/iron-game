@@ -1,3 +1,4 @@
+use hecs::Entity;
 use inflector::cases::titlecase::to_title_case;
 use rand::{Rng, distributions::Slice, prelude::IteratorRandom, random, thread_rng};
 use rand_distr::Uniform;
@@ -8,25 +9,21 @@ use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash
 #[derive(Clone, Debug)]
 pub struct MigrationStatus {
     pub migrating: isize,
-    pub dest: ProvinceId,
+    pub dest: Province,
     pub date: usize,
-    pub settlement: Option<SettlementId>,
+    pub settlement: Option<Settlement>,
 }
 
 #[iron_data]
-pub struct Pop {
-    pub id: Option<PopId>,
-    pub size: isize,
-    pub culture: CultureId,
-    pub settlement: SettlementId,
-    pub province: ProvinceId,
-    pub kid_buffer: KidBuffer,
-    pub owned_goods: GoodStorage,
-    pub satiety: Satiety,
-    pub farmed_good: Option<GoodType>,
-    pub migration_status: Option<MigrationStatus>,
-    pub polity: PolityId,
+pub struct Pop(pub Entity);
+pub struct PopInfo {
+    size: isize,
 }
+pub struct PopSettlement(pub Settlement);
+pub struct PopProvince(pub Province);
+pub struct PopCulture(pub Culture);
+pub struct PopPolity(pub Polity);
+pub struct FarmedGood(pub GoodType);
 
 impl Pop {
     pub fn good_satiety(&self, good: GoodType) -> Satiety {
@@ -46,7 +43,7 @@ impl Pop {
         10.0
     }
 
-    pub fn evaluate_site(&self, site: &Site, world: &World, province: ProvinceId) -> f32 {
+    pub fn evaluate_site(&self, site: &Site, world: &World) -> f32 {
         let mut score = 20.0;
         for feature in site.features.iter() {
             score += match *feature {
@@ -65,11 +62,11 @@ impl Pop {
         score
     }
 
-    pub fn evaluate_sites(&self, sites: Vec<Site>, world: &World, province: ProvinceId) -> Site {
+    pub fn evaluate_sites(&self, sites: Vec<Site>, world: &World) -> Site {
         let mut max_site = &sites[0];
         let mut max_value = 0.0;
         for site in sites.iter() {
-            let value = self.evaluate_site(site, world, province.clone());
+            let value = self.evaluate_site(site, world);
             if value > max_value {
                 max_value = value;
                 max_site = site;
@@ -79,11 +76,18 @@ impl Pop {
     }
 }
 
-pub fn harvest(pop: &PopId, world: &World) {
+#[macro_export]
+macro_rules! id_comp {
+	( $world:expr, $id:expr, $comp_t:ident) => {
+		$world.hecs.get::<$comp_t>($id.0).unwrap()
+	};
+}
+
+pub fn harvest(pop: Pop, world: &World) {
     // println!("harvest pop?");
-    if let Some(farmed_good) = pop.get().farmed_good {
-        let mut farmed_amount = pop.get().size as f32;
-        let carrying_capacity = pop.get().settlement.get().carrying_capacity(world);
+    if let Some(farmed_good) = id_comp!(world, pop, FarmedGood) {
+        let mut farmed_amount = id_comp!(world, pop, PopInfo).size as f32;
+        let carrying_capacity = id_comp!(world, pop, PopSettlement).0.carrying_capacity(world);
         let comfortable_limit = carrying_capacity / 2.0;
         let pop_size = pop.get().settlement.get().population(world) as f32;
         if pop_size > comfortable_limit {
@@ -199,31 +203,108 @@ pub enum CultureFeature {
     Seafaring,
 }
 
-#[iron_data]
 pub struct Culture {
-    pub id: Option<CultureId>,
     pub name: String,
-    pub religion: ReligionId,
-    pub language: LanguageId,
-    pub features: Vec<CultureFeature>,
 }
 
 impl Culture {
-    pub fn generate_character(&self, sex: Sex, age: isize, world: &mut World) -> CharacterId {
-        world.insert(Character {
-            id: None,
-            name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
-            birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
-            sex,
-            health: dev_mean_sample(5.0, 60.0) as f32,
-            death: None,
-            features: HashSet::new(),
-        })
+    pub fn generate_character(self, culture: Culture, sex: Sex, age: isize, world: &mut World) -> Entity {
+        world.hecs.spawn((
+            culture,
+            Character{
+                name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
+                birthday: (),
+                sex: (),
+                death: (),
+                health: (),
+            },
+        ))
+        // world.insert(Character {
+        //     id: None,
+        //     name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
+        //     birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
+        //     sex,
+        //     health: dev_mean_sample(5.0, 60.0) as f32,
+        //     death: None,
+        //     features: HashSet::new(),
+        // })
     }
 }
 
-#[iron_data]
 pub struct Religion {
-    pub id: Option<ReligionId>,
     pub name: String,
+}
+
+#[derive(Debug)]
+pub struct KidBuffer(VecDeque<isize>);
+
+impl KidBuffer {
+    pub fn new() -> Self {
+        Self(VecDeque::new())
+    }
+
+    pub fn size(&self) -> isize {
+        self.0.iter().fold(0, |acc, e| acc + e)
+    }
+
+    pub fn spawn(&mut self, babies: isize) -> isize {
+        // println!("spawn babies {}", babies);
+        self.0.push_front(babies);
+        // println!("{:?}", self);
+        if self.0.len() > 12 {
+            self.0.pop_back().unwrap()
+        } else {
+            babies
+        }
+    }
+
+    pub fn starve(&mut self) -> isize {
+        let cohort = sample(3.0).abs().min(12.0) as usize;
+        if self.0.len() > cohort {
+            let cohort_size = self.0[cohort];
+            let dead_kids = positive_isample(cohort_size / 20 + 2, cohort_size / 5 + 1);
+            // println!("cohort {}, size {}, dead {}", cohort, cohort_size, dead_kids);
+            self.0[cohort] = (cohort_size - dead_kids).max(0);
+            cohort_size - self.0[cohort]
+        } else {
+            0
+        }
+    }
+}
+
+#[derive(PartialEq)]
+pub struct Satiety {
+    pub base: f32,
+    pub luxury: f32,
+}
+
+impl std::ops::Add for Satiety {
+    type Output = Satiety;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Satiety {
+            base: self.base + rhs.base,
+            luxury: self.luxury + rhs.luxury,
+        }
+    }
+}
+
+impl std::ops::AddAssign for Satiety {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = Satiety {
+            base: self.base + rhs.base,
+            luxury: self.luxury + rhs.luxury,
+        };
+    }
+}
+
+impl std::ops::Mul<Satiety> for f32 {
+    type Output = Satiety;
+
+    fn mul(self, rhs: Satiety) -> Self::Output {
+        Satiety {
+            base: rhs.base * self,
+            luxury: rhs.luxury * self,
+        }
+    }
 }
