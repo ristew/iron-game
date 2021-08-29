@@ -1,4 +1,7 @@
+use hecs::Entity;
+
 use crate::*;
+use std::collections::{HashMap, HashSet};
 
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub enum SettlementFeature {
@@ -56,32 +59,22 @@ impl SettlementLevel {
     }
 }
 
-pub struct SettlementRef(pub Entity);
+pub struct Settlement(pub Entity);
 
-impl SettlementRef {
-    pub fn carrying_capacity(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::CarryingCapacity, 100.0)
-    }
-}
-
-impl Factored for SettlementRef {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
-    }
-}
-
-pub struct Settlement{
+pub struct SettlementInfo {
     pub name: String,
-    pub primary_culture: CultureId,
-    pub level: SettlementLevel,
 }
 
 pub struct SettlementFeatures(HashSet<SettlementFeature>);
 
 impl Settlement {
+    pub fn province(&self, world: &World) -> Province {
+        *world.get::<Province>(self.0).unwrap()
+    }
     pub fn factor(&self, world: &World, ftype: FactorType, base: f32) -> f32 {
         let mut factors = vec![
-            self.province.get().terrain.factor(world, ftype),
-            self.province.get().climate.factor(world, ftype),
+            world.get::<Geography>(world.get::<Province>(self.0).0).terrain.factor(world, ftype),
+            world.get::<Geography>(world.get::<Province>(self.0).0).climate.factor(world, ftype),
         ];
         factors.extend(self.features.iter().map(|f| f.factor(world, ftype)));
         apply_maybe_factors(base, factors)

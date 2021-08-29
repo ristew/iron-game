@@ -16,15 +16,15 @@ pub enum CharacterFeature {
     Idiot,
 }
 
-pub struct CharacterRef<'a>(pub EntityRef<'a>);
+pub struct Character(Entity);
 
-pub struct Character {
-    pub name: String,
+pub struct CharacterInfo {
     pub birthday: Date,
     pub sex: Sex,
     pub death: Option<Date>,
-    pub health: f32,
 }
+
+pub struct Health(pub f32);
 
 pub fn title(world: &World, character_ref: CharacterRef) -> String {
     let character_info = character_ref.get::<Character>();

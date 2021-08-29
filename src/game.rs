@@ -430,10 +430,14 @@ pub struct ProvinceFeatures(pub HashSet<ProvinceFeature>);
 pub struct Controller(pub Entity);
 
 #[derive(IronData, Debug, Clone, Copy)]
-pub struct ProvinceRef(pub Entity);
+pub struct Province(pub Entity);
 
 
 impl Province {
+    pub fn geography(&self, world: &World) -> Ref<'_, Geography> {
+        world.hecs.get::<Geography>(self.0).unwrap()
+    }
+
     pub fn population(&self, world: &World) -> isize {
         let mut total_pop = 0;
         for settlement in world.hecs.get::<Settlements>(self.0).iter() {
@@ -578,14 +582,11 @@ pub enum SuccessorLaw {
     Election,
 }
 
-pub struct PolityRef<'a>(pub EntityRef<'a>);
-
-pub struct Polity {
-    pub name: String,
-}
-
+pub struct Polity(pub Entity);
+pub struct Name(pub String);
 pub struct Capital(pub Settlement);
 pub struct Leader(pub Character);
+pub struct PrimaryCulture(pub Culture);
 
 #[derive(Clone, Debug)]
 pub struct Site {
@@ -675,39 +676,39 @@ impl Hash for TechLevel {
     }
 }
 
-pub struct IronIdInner<T>(pub Rc<RefCell<T>>) where T: Sized;
+// pub struct IronIdInner<T>(pub Rc<RefCell<T>>) where T: Sized;
 
-impl<T> Clone for IronIdInner<T> {
-    fn clone(&self) -> Self {
-        IronIdInner(self.0.clone())
-    }
-}
+// impl<T> Clone for IronIdInner<T> {
+//     fn clone(&self) -> Self {
+//         IronIdInner(self.0.clone())
+//     }
+// }
 
-impl <T> IronIdInner<T> {
-    pub fn get_inner_ref<'a>(&'a self) -> impl Deref<Target = T> + 'a {
-        self.0.borrow()
-    }
-    pub fn borrow<'a>(&'a self) -> impl Deref<Target = T> + 'a {
-        self.0.borrow()
-    }
-    pub fn borrow_mut<'a>(&'a self) -> impl DerefMut<Target = T> + 'a {
-        self.0.borrow_mut()
-    }
-}
+// impl <T> IronIdInner<T> {
+//     pub fn get_inner_ref<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+//         self.0.borrow()
+//     }
+//     pub fn borrow<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+//         self.0.borrow()
+//     }
+//     pub fn borrow_mut<'a>(&'a self) -> impl DerefMut<Target = T> + 'a {
+//         self.0.borrow_mut()
+//     }
+// }
 
-pub trait IronId {
-    type Target: IronData<IdType = Self> + Sized;
-    fn new(id: usize, inner: IronIdInner<Self::Target>) -> Self;
-    fn num(&self) -> usize;
-    fn get_inner(&self) -> &IronIdInner<Self::Target>;
-    fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
-    where
-        F: Fn(Self, &World) -> String + 'static,
-        Self: Sized + Clone,
-    {
-        InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
-    }
-}
+// pub trait IronId {
+//     type Target: IronData<IdType = Self> + Sized;
+//     fn new(id: usize, inner: IronIdInner<Self::Target>) -> Self;
+//     fn num(&self) -> usize;
+//     fn get_inner(&self) -> &IronIdInner<Self::Target>;
+//     fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
+//     where
+//         F: Fn(Self, &World) -> String + 'static,
+//         Self: Sized + Clone,
+//     {
+//         InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
+//     }
+// }
 
 pub trait IronData {
     fn id(&self) -> Entity;

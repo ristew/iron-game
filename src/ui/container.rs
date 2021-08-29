@@ -312,8 +312,8 @@ pub struct InfoContainer<T>
 where
     T: IronData,
 {
-    pub id: T::IdType,
-    pub mapping: Box<dyn Fn(T::IdType, &World) -> String>,
+    pub id: T,
+    pub mapping: Box<dyn Fn(T, &World) -> String>,
     pub inner: TextContainer,
 }
 
@@ -321,9 +321,9 @@ impl<T> InfoContainer<T>
 where
     T: IronData,
 {
-    pub fn new<F>(id: T::IdType, mapping: Box<F>) -> Rc<RefCell<Self>>
+    pub fn new<F>(id: T, mapping: Box<F>) -> Rc<RefCell<Self>>
     where
-        F: Fn(T::IdType, &World) -> String + 'static,
+        F: Fn(T, &World) -> String + 'static,
     {
         Rc::new(RefCell::new(Self {
             id,
@@ -332,9 +332,9 @@ where
         }))
     }
 
-    pub fn new_world<F>(id: T::IdType, mapping: F) -> Rc<RefCell<Self>>
+    pub fn new_world<F>(id: T, mapping: F) -> Rc<RefCell<Self>>
     where
-        F: Fn(T::IdType, &World) -> String + 'static,
+        F: Fn(T, &World) -> String + 'static,
     {
         Rc::new(RefCell::new(Self {
             id,

@@ -5,7 +5,7 @@ use noise::{Fbm, HybridMulti, NoiseFn, Perlin};
 use rand::{Rng, random, thread_rng};
 use rand_distr::Uniform;
 
-use crate::*;
+use crate::{self::*, settlement::Settlement};
 
 const MAP_SIZE: isize = 100;
 
@@ -115,71 +115,7 @@ pub fn create_test_world(world: &mut World) {
     }
 }
 
-pub fn add_polity(world: &mut World, name: String, culture: Culture, level: PolityLevel) -> PolityId {
-    let age = positive_isample(8, 45);
-    let leader = generate_character(culture, Sex::Male, age, world);
-    let entity = world.hecs.spawn((
-        PolityInfo {
-            name,
-        },
-        Leader(leader),
-        SuccessorLaw::Election,
-        level,
-        culture,
-    ))
-}
-
-fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId) -> SettlementId {
-    add_settlement(world, culture_id, province_id, polity_id, 100)
-}
-pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId, size: isize) -> SettlementId {
-    let sites = province_id.get().generate_sites(world, 3);
-    let leader = if polity_id.get().capital.is_none() {
-        polity_id.get().leader.clone()
-    } else {
-        let age = positive_isample(8, 45);
-        culture_id.get().generate_character(Sex::Male, age, world)
-    };
-
-    let settlement_id = world.insert_settlement(Settlement {
-        id: None,
-        name: culture_id.get().language.get().generate_name(4),
-        pops: vec![],
-        features: HashSet::new(),
-        primary_culture: culture_id.clone(),
-        province: province_id.clone(),
-        level: SettlementLevel::Village,
-        controller: polity_id.clone(),
-        headman: leader.clone(),
-        successor_law: SuccessorLaw::Election,
-    });
-    let pop_id = world.insert(Pop {
-        id: None,
-        size,
-        farmed_good: Some(Wheat),
-        culture: culture_id.clone(),
-        settlement: settlement_id.clone(),
-        province: province_id.clone(),
-        satiety: Satiety {
-            base: 0.0,
-            luxury: 0.0,
-        },
-        kid_buffer: KidBuffer::new(),
-        owned_goods: GoodStorage(HashMap::new()),
-        migration_status: None,
-        polity: polity_id.clone(),
-    });
-    let site = pop_id.get().evaluate_sites(sites, world, province_id.clone());
-    settlement_id.get_mut().features = site.features;
-    settlement_id.get_mut().pops.push(pop_id.clone());
-
-    if polity_id.get().capital.is_none() {
-        polity_id.get_mut().capital = Some(settlement_id.clone());
-    }
-
-    pop_id
-        .get_mut()
-        .owned_goods
-        .add(Wheat, size as f32 * 250.0);
-    settlement_id
+fn add_test_settlement(world: &mut World, culture: Culture, province: Province, polity: Polity) -> Settlement {
+    let name = culture.langauage(world).generate_name(3);
+    world.insert_settlement(name, culture, province, polity, 100)
 }

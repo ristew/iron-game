@@ -20,7 +20,6 @@ pub struct PopInfo {
     size: isize,
 }
 pub struct PopSettlement(pub Settlement);
-pub struct PopProvince(pub Province);
 pub struct PopCulture(pub Culture);
 pub struct PopPolity(pub Polity);
 pub struct FarmedGood(pub GoodType);
@@ -43,7 +42,7 @@ impl Pop {
         10.0
     }
 
-    pub fn evaluate_site(&self, site: &Site, world: &World) -> f32 {
+    pub fn evaluate_site(&self, world: &World, site: &Site) -> f32 {
         let mut score = 20.0;
         for feature in site.features.iter() {
             score += match *feature {
@@ -62,11 +61,11 @@ impl Pop {
         score
     }
 
-    pub fn evaluate_sites(&self, sites: Vec<Site>, world: &World) -> Site {
+    pub fn evaluate_sites(&self, world: &World, sites: Vec<Site>) -> Site {
         let mut max_site = &sites[0];
         let mut max_value = 0.0;
         for site in sites.iter() {
-            let value = self.evaluate_site(site, world);
+            let value = self.evaluate_site(world, site);
             if value > max_value {
                 max_value = value;
                 max_site = site;
@@ -112,9 +111,7 @@ pub fn harvest(pop: Pop, world: &World) {
     }
 }
 
-#[iron_data]
 pub struct Language {
-    pub id: Option<LanguageId>,
     pub name: String,
     pub vowels: Vec<String>,
     pub initial_consonants: Vec<String>,
@@ -203,31 +200,11 @@ pub enum CultureFeature {
     Seafaring,
 }
 
-pub struct Culture {
-    pub name: String,
-}
+pub struct Culture(pub Entity);
 
 impl Culture {
-    pub fn generate_character(self, culture: Culture, sex: Sex, age: isize, world: &mut World) -> Entity {
-        world.hecs.spawn((
-            culture,
-            Character{
-                name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
-                birthday: (),
-                sex: (),
-                death: (),
-                health: (),
-            },
-        ))
-        // world.insert(Character {
-        //     id: None,
-        //     name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
-        //     birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
-        //     sex,
-        //     health: dev_mean_sample(5.0, 60.0) as f32,
-        //     death: None,
-        //     features: HashSet::new(),
-        // })
+    pub fn language(&self, world: &World) -> &Language {
+        world.hecs.get::<Language>(self).unwrap()
     }
 }
 

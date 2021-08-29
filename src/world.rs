@@ -13,6 +13,7 @@ use ggez::{
     graphics::{self, Color, DrawMode, DrawParam, Mesh, MeshBatch, Rect, StrokeOptions},
     Context,
 };
+use hecs::Component;
 use rand::{thread_rng, Rng};
 use rand_distr::{Standard, Uniform};
 use rayon::prelude::*;
@@ -62,12 +63,12 @@ impl Debug for Date {
 
 pub struct World {
     pub date: Date,
-    pub province_coord_map: HashMap<Coordinate, ProvinceId>,
+    pub province_coord_map: HashMap<Coordinate, Province>,
     pub storages: Storages,
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
-    pub selected_province: Option<ProvinceId>,
+    pub selected_province: Option<Province>,
     pub population: isize,
     pub hecs: hecs::World,
 }
@@ -75,6 +76,11 @@ pub struct World {
 impl World {
     pub fn add_command(&self, command: Box<dyn Command>) {
         self.commands.borrow_mut().push(command);
+    }
+
+    pub fn get_ref<T, C>(&self, ref_ptr: T) -> C
+        where T: IronRef, C: Component {
+
     }
 
     pub fn process_command_queue(&mut self) {
@@ -94,25 +100,99 @@ impl World {
         }
     }
 
-    pub fn insert_province(&mut self, province: Province) {
-        let province_id = self.insert::<Province>(province);
-        self.province_coord_map
-            .insert(province_id.get().coordinate, province_id.clone());
+    pub fn insert_province(&mut self, geography: Geography) -> Province {
+        let entity = world.hecs.spawn((
+            Settlements(Vec::new()),
+            geography,
+            ProvinceFeatures(HashSet::new()),
+        ));
+
+        self.hecs.insert(entity, Pop(entity));
+        Pop(entity)
     }
 
-    pub fn get_province_coordinate(&self, coord: Coordinate) -> Option<ProvinceId> {
-        self.province_coord_map.get(&coord).map(|p| p.clone())
+    pub fn get_province_coordinate(&self, coord: Coordinate) -> Option<Province> {
+        self.province_coord_map.get(&coord).map(|p| *p)
     }
 
-    pub fn insert_settlement(&mut self, settlement: Settlement) -> SettlementId {
-        let set_id = self.insert::<Settlement>(settlement);
-        set_id
-            .get()
-            .province
+    pub fn insert_settlement(&mut self, name: String, culture: Culture, province: Province, polity: Polity, size: isize) -> Settlement {
+        let sites = province_id.get().generate_sites(world, 3);
+        let leader = if polity_id.get().capital.is_none() {
+            polity_id.get().leader.clone()
+        } else {
+            let age = positive_isample(8, 45);
+            culture_id.get().generate_character(Sex::Male, age, world)
+        };
+
+        let settlement = Settlement(self.hecs.spawn((
+            SettlementInfo { name },
+            SettlementFeatures(HashSet::new()),
+            Pops(Vec::new()),
+            culture,
+            province,
+            polity,
+        )));
+
+        let pop = self.insert_pop(size, settlement, culture, polity);
+
+        let site = pop.evaluate_sites(world, sites, province_id.clone());
+        settlement_id.get_mut().features = site.features;
+        settlement_id.get_mut().pops.push(pop_id.clone());
+
+        if polity_id.get().capital.is_none() {
+            polity_id.get_mut().capital = Some(settlement_id.clone());
+        }
+
+        pop_id
             .get_mut()
-            .settlements
-            .push(set_id.clone());
-        set_id
+            .owned_goods
+            .add(Wheat, size as f32 * 250.0);
+        settlement_id
+    }
+
+    pub fn generate_character(&mut self, culture: Culture, sex: Sex, age: isize) -> Entity {
+        world.hecs.spawn((
+            culture,
+            Character {
+                name: format!("{} {}", id_comp!(self, culture, Language).generate_name(2), "BigGuns"),
+                birthday: (),
+                sex: (),
+                death: (),
+                health: (),
+            },
+        ))
+        // world.insert(Character {
+        //     id: None,
+        //     name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
+        //     birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
+        //     sex,
+        //     health: dev_mean_sample(5.0, 60.0) as f32,
+        //     death: None,
+        //     features: HashSet::new(),
+        // })
+    }
+
+    pub fn insert_polity(&mut self, name: String, culture: Culture, level: PolityLevel, capital: Settlement) -> Polity {
+        let age = positive_isample(8, 45);
+        let leader = self.generate_character(culture, Sex::Male, age);
+        Polity(self.hecs.spawn((
+            Name(name),
+            Leader(leader),
+            SuccessorLaw::Election,
+            level,
+            Capital(capital),
+            PrimaryCulture(culture),
+        )))
+    }
+
+    pub fn insert_pop(&mut self, size: usize, settlement: Settlement, culture: Culture, polity: Polity) -> Pop {
+        Pop(self.hecs.spawn((
+            PopInfo { size },
+            PopSettlement(settlement),
+            PopCulture(culture),
+            PopPolity(polity),
+            FarmedGood(GoodType::Wheat),
+        )))
     }
 
     pub fn insert<T>(&mut self, data: T) -> T::IdType
