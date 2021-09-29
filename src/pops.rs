@@ -3,7 +3,7 @@ use rand::{Rng, distributions::Slice, prelude::IteratorRandom, random, thread_rn
 use rand_distr::Uniform;
 
 use crate::*;
-use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash, mem::MaybeUninit, rc::Rc, rc::Weak};
 
 #[derive(Clone, Debug)]
 pub struct MigrationStatus {
@@ -15,7 +15,7 @@ pub struct MigrationStatus {
 
 #[iron_data]
 pub struct Pop {
-    pub id: Option<PopId>,
+    pub id: MaybeUninit<PopId>,
     pub size: isize,
     pub culture: CultureId,
     pub settlement: SettlementId,
@@ -110,7 +110,7 @@ pub fn harvest(pop: &PopId, world: &World) {
 
 #[iron_data]
 pub struct Language {
-    pub id: Option<LanguageId>,
+    pub id: MaybeUninit<LanguageId>,
     pub name: String,
     pub vowels: Vec<String>,
     pub initial_consonants: Vec<String>,
@@ -162,7 +162,7 @@ impl Language {
         let end_consonants = list_filter_chance(&consonants, 0.50);
 
         Self {
-            id: None,
+            id: PopId::uninit(),
             name: "".to_owned(),
             vowels,
             initial_consonants,
@@ -201,7 +201,7 @@ pub enum CultureFeature {
 
 #[iron_data]
 pub struct Culture {
-    pub id: Option<CultureId>,
+    pub id: MaybeUninit<CultureId>,
     pub name: String,
     pub religion: ReligionId,
     pub language: LanguageId,
@@ -211,7 +211,7 @@ pub struct Culture {
 impl Culture {
     pub fn generate_character(&self, sex: Sex, age: isize, world: &mut World) -> CharacterId {
         world.insert(Character {
-            id: None,
+            id: CharacterId::uninit(),
             name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
             birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
             sex,
@@ -224,6 +224,6 @@ impl Culture {
 
 #[iron_data]
 pub struct Religion {
-    pub id: Option<ReligionId>,
+    pub id: MaybeUninit<ReligionId>,
     pub name: String,
 }

@@ -34,7 +34,7 @@ impl Date {
     }
 
     pub fn month(&self) -> usize {
-        (self.day / 30) % 12
+        (self.day / 30) % 12 + 1
     }
 
     pub fn year(&self) -> usize {
@@ -56,7 +56,7 @@ pub fn parse_path(path: &'static str) {
 
 impl Debug for Date {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("{}/{}/{}", self.month(), self.day_of_month(), self.year()).as_str())
+        f.write_str(format!("{:02}/{:02}/{}", self.month(), self.day_of_month(), self.year()).as_str())
     }
 }
 
@@ -64,6 +64,7 @@ pub struct World {
     pub date: Date,
     pub province_coord_map: HashMap<Coordinate, ProvinceId>,
     pub storages: Storages,
+    pub formula_system: FormulaSystem<FactorRef, FactorType>,
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
@@ -133,6 +134,7 @@ impl World {
             date: Date { day: 0 },
             province_coord_map: Default::default(),
             storages: Default::default(),
+            formula_system: Default::default(),
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
@@ -169,9 +171,9 @@ pub fn pops_yearly_growth(world: &World) {
 }
 
 pub fn harvest_provinces(world: &World) {
-    for province in world.storages.get_storage::<Province>().rcs.iter() {
-        if world.date.month() == province.borrow().harvest_month {
-            for settlement in province.borrow().settlements.iter() {
+    for province in world.storages.get_storage::<Province>().ids.iter() {
+        if world.date.month() == province.get().harvest_month {
+            for settlement in province.get().settlements.iter() {
                 for pop in settlement.get().pops.iter() {
                     harvest(pop, world);
                 }

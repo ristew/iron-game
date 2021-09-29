@@ -184,7 +184,7 @@ impl Command for SettlementUpdateHeadmanCommand {
         };
         let old_headman = self.0.get().headman.clone();
         self.0.get_mut().headman = headman.clone();
-        println!("change headman: {} to {}", old_headman.get().title(world), headman.get().title(world));
+        println!("{:?} change headman: {} to {}", world.date, old_headman.get().title(world), headman.get().title(world));
     }
 }
 

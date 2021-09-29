@@ -22,6 +22,8 @@ pub mod ui;
 pub mod world;
 pub mod worldgen;
 pub mod agent;
+pub mod formula;
+pub mod factor;
 
 pub use commands::*;
 pub use game_events::*;
@@ -37,6 +39,8 @@ pub use ui::*;
 pub use world::*;
 pub use worldgen::*;
 pub use agent::*;
+pub use formula::*;
+pub use factor::*;
 
 fn main() {
     let cb = ContextBuilder::new("iron-age", "ristew")

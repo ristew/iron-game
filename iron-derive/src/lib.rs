@@ -59,6 +59,9 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
                 &self.inner
             }
 
+            fn factor_ref(&self) -> FactorRef {
+                FactorRef::#name(self.clone())
+            }
         }
 
         impl #name_id {
@@ -99,11 +102,11 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
             // type StorageType = crate::storage::Storage<Object = #name>;
 
             fn id(&self) -> Self::IdType {
-                self.id.clone().unwrap()
+                crate::Id::new()
             }
 
             fn set_id(&mut self, id: Self::IdType) {
-                self.id = Some(id.clone());
+                self.id = id.clone();
             }
         }
     };

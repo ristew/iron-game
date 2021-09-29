@@ -58,7 +58,7 @@ pub trait Storage {
     fn new() -> Self
     where
         Self: Sized;
-    fn insert(&mut self, item: Self::Object) -> Self::Id;
+    fn insert(&mut self, item: Self::Object);
     fn get_id(&mut self) -> usize;
     fn remove(&mut self, id: &Self::Id);
 }
@@ -94,6 +94,17 @@ where
     pub fn has_id(&self, id: &Id) -> bool {
         self.id_map.contains_key(&id.num())
     }
+
+    fn insert_id(&mut self, id: Id) {
+        rc.borrow_mut().set_id(id.clone());
+
+        self.rcs.push(rc.clone());
+        self.id_map
+            .insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
+        self.ids.push(id.clone());
+        let x = (*rc).borrow();
+        x.id()
+    }
 }
 
 impl<T, Id> Storage for ObjectStorage<T, Id>
@@ -107,17 +118,11 @@ where
     fn new() -> Self {
         Self::default()
     }
-    fn insert(&mut self, item: Self::Object) -> Self::Id {
-        let rc = Rc::new(RefCell::new(item));
-        let id = Self::Id::new(self.get_id(), IronIdInner(rc.clone()));
-        rc.borrow_mut().set_id(id.clone());
-
-        self.rcs.push(rc.clone());
-        self.id_map
-            .insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
-        self.ids.push(id.clone());
-        let x = (*rc).borrow();
-        x.id()
+    fn insert(&mut self, data: T) -> Id {
+        let rc = Rc::new(RefCell::new(data));
+        let id = Self::Id::new(self.get_storage_mut::<T>().get_id(), IronIdInner(rc.clone()));
+        self.insert_id(id.clone());
+        id
     }
 
     fn get_id(&mut self) -> usize {
@@ -192,8 +197,8 @@ impl Storages {
     where
         T: IronData + 'static,
     {
-        self.get_storage_mut::<T>().insert(data)
-
+        self.get_storage_mut::<T>().insert(id.clone());
+        id
     }
 
     pub fn remove<T>(&mut self, id: &T::IdType)

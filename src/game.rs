@@ -7,7 +7,8 @@ use ggez::{
 };
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, random, thread_rng};
-use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, time::Duration};
+use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, mem::MaybeUninit, ops::{Deref, DerefMut}, rc::{Rc, Weak}, sync::Arc, time::Duration};
+use parking_lot::RwLock;
 pub use GoodType::*;
 
 pub const TILE_SIZE_X: f32 = 16.0;
@@ -174,31 +175,31 @@ impl Display for Terrain {
     }
 }
 
-impl Factored for Terrain {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
-        match factor {
-            FactorType::CarryingCapacity => Some(match *self {
-                Terrain::Plains => Factor::factor(1.0),
-                Terrain::Hills => Factor::factor(0.7),
-                Terrain::Mountains => Factor::factor(0.2),
-                Terrain::Desert => Factor::factor(0.1),
-                Terrain::Marsh => Factor::factor(0.5),
-                Terrain::Forest => Factor::factor(0.5),
-                Terrain::Ocean => Factor::factor(0.0),
-            }),
-            FactorType::SettlementRating => Some(match *self {
-                Terrain::Plains => Factor::factor(1.0),
-                // slightly prefer hills for defensibility
-                Terrain::Hills => Factor::factor(1.1),
-                Terrain::Mountains => Factor::factor(0.2),
-                Terrain::Desert => Factor::factor(0.1),
-                Terrain::Marsh => Factor::factor(0.5),
-                Terrain::Forest => Factor::factor(0.5),
-                Terrain::Ocean => Factor::factor(0.0),
-            }),
-        }
-    }
-}
+// impl Factored for Terrain {
+//     fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
+//         match factor {
+//             FactorType::CarryingCapacity => Some(match *self {
+//                 Terrain::Plains => Factor::factor(1.0),
+//                 Terrain::Hills => Factor::factor(0.7),
+//                 Terrain::Mountains => Factor::factor(0.2),
+//                 Terrain::Desert => Factor::factor(0.1),
+//                 Terrain::Marsh => Factor::factor(0.5),
+//                 Terrain::Forest => Factor::factor(0.5),
+//                 Terrain::Ocean => Factor::factor(0.0),
+//             }),
+//             FactorType::SettlementRating => Some(match *self {
+//                 Terrain::Plains => Factor::factor(1.0),
+//                 // slightly prefer hills for defensibility
+//                 Terrain::Hills => Factor::factor(1.1),
+//                 Terrain::Mountains => Factor::factor(0.2),
+//                 Terrain::Desert => Factor::factor(0.1),
+//                 Terrain::Marsh => Factor::factor(0.5),
+//                 Terrain::Forest => Factor::factor(0.5),
+//                 Terrain::Ocean => Factor::factor(0.0),
+//             }),
+//         }
+//     }
+// }
 
 impl Terrain {
     pub fn color(self) -> Color {
@@ -222,26 +223,6 @@ pub enum Climate {
     Cold,
 }
 
-impl Factored for Climate {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
-        match factor {
-            FactorType::CarryingCapacity => Some(match *self {
-                Climate::Tropical => Factor::factor(1.2),
-                Climate::Dry => Factor::factor(0.7),
-                Climate::Mild => Factor::factor(1.0),
-                Climate::Cold => Factor::factor(0.7),
-            }),
-            FactorType::SettlementRating => Some(match *self {
-                Climate::Tropical => Factor::factor(0.8),
-                Climate::Dry => Factor::factor(0.6),
-                Climate::Mild => Factor::factor(1.0),
-                Climate::Cold => Factor::factor(0.8),
-            }),
-            _ => None,
-        }
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 pub enum GoodType {
     Wheat,
@@ -263,57 +244,6 @@ pub enum GoodType {
     Textiles,
     LuxuryClothes,
     Slaves, // ?? how to handle
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum FactorType {
-    CarryingCapacity,
-    SettlementRating,
-}
-
-pub enum FactorOp {
-    Add,
-    Mul,
-}
-
-pub struct Factor {
-    amount: f32,
-    op: FactorOp,
-}
-
-impl Factor {
-    pub fn factor(amount: f32) -> Self {
-        Self {
-            amount,
-            op: FactorOp::Mul,
-        }
-    }
-
-    pub fn bonus(amount: f32) -> Self {
-        Self {
-            amount,
-            op: FactorOp::Add,
-        }
-    }
-}
-
-pub fn apply_maybe_factors(base: f32, factors: Vec<Option<Factor>>) -> f32 {
-    let mut bonus = 0.0;
-    let mut res = base;
-    for factor_opt in factors.iter() {
-        if let Some(factor) = factor_opt {
-            match factor.op {
-                FactorOp::Add => bonus += factor.amount,
-                FactorOp::Mul => res *= factor.amount,
-            }
-        }
-    }
-
-    res + bonus
-}
-
-pub trait Factored {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor>;
 }
 
 lazy_static! {
@@ -405,7 +335,7 @@ pub enum ProvinceFeature {
 use SettlementFeature::*;
 #[iron_data]
 pub struct Province {
-    pub id: Option<ProvinceId>,
+    pub id: MaybeUninit<ProvinceId>,
     pub settlements: Vec<SettlementId>,
     pub terrain: Terrain,
     pub climate: Climate,
@@ -536,15 +466,6 @@ impl Province {
     }
 }
 
-impl Factored for Province {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
-        Some(Factor::bonus(match factor {
-            FactorType::CarryingCapacity => todo!(),
-            FactorType::SettlementRating => todo!(),
-        }))
-    }
-}
-
 pub enum PolityLevel {
     Tribe, // one village
     Chiefdom, // a few villages united under a chief
@@ -561,7 +482,7 @@ pub enum SuccessorLaw {
 
 #[iron_data]
 pub struct Polity {
-    pub id: Option<PolityId>,
+    pub id: MaybeUninit<PolityId>,
     pub name: String,
     pub primary_culture: CultureId,
     pub capital: Option<SettlementId>,
@@ -593,29 +514,6 @@ pub enum SettlementFeature {
     Infertile,
 }
 
-impl Factored for SettlementFeature {
-    fn factor(&self, world: &World, factor: FactorType) -> Option<Factor> {
-        match factor {
-            FactorType::CarryingCapacity => match *self {
-                SettlementFeature::Riverside => Some(Factor::factor(1.5)),
-                SettlementFeature::Fertile => Some(Factor::factor(1.4)),
-                SettlementFeature::Infertile => Some(Factor::factor(0.5)),
-                _ => None,
-            },
-            FactorType::SettlementRating => match *self {
-                SettlementFeature::Hilltop => Some(Factor::factor(1.5)),
-                SettlementFeature::Riverside => Some(Factor::factor(1.5)),
-                SettlementFeature::Oceanside => Some(Factor::factor(1.1)),
-                SettlementFeature::Harbor => Some(Factor::factor(1.5)),
-                SettlementFeature::Mines(_) => Some(Factor::factor(1.3)),
-                SettlementFeature::Fertile => Some(Factor::factor(1.4)),
-                SettlementFeature::Infertile => Some(Factor::factor(0.5)),
-                _ => None,
-            },
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SettlementLevel {
     Hamlet,
@@ -639,7 +537,7 @@ impl SettlementLevel {
 
 #[iron_data]
 pub struct Settlement {
-    pub id: Option<SettlementId>,
+    pub id: usize,
     pub name: String,
     pub pops: Vec<PopId>,
     pub features: HashSet<SettlementFeature>,
@@ -666,17 +564,9 @@ impl Featured<SettlementFeature> for Settlement {
 }
 
 impl Settlement {
-    pub fn factor(&self, world: &World, ftype: FactorType, base: f32) -> f32 {
-        let mut factors = vec![
-            self.province.get().terrain.factor(world, ftype),
-            self.province.get().climate.factor(world, ftype),
-        ];
-        factors.extend(self.features.iter().map(|f| f.factor(world, ftype)));
-        apply_maybe_factors(base, factors)
-    }
-
     pub fn carrying_capacity(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::CarryingCapacity, 100.0)
+        // world.formula_system.get_factor(&(self.id.unwrap().factor_ref(), FactorType::SettlementCarryingCapacity))
+        0.0
     }
 
     pub fn population(&self, world: &World) -> isize {
@@ -688,9 +578,9 @@ impl Settlement {
     }
 
     // rating is a measure of how attractive a settlement is
-    pub fn rating(&self, world: &World) -> f32 {
-        self.factor(world, FactorType::SettlementRating, self.level.rating())
-    }
+    // pub fn rating(&self, world: &World) -> f32 {
+    //     world.formula_system.get_factor(&(self.id.unwrap(), FactorType::SettlementRating))
+    // }
 
     pub fn accept_migrants(&mut self, world: &mut World, pop: PopId, amount: isize) {
         println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
@@ -698,7 +588,7 @@ impl Settlement {
             dpop.get_mut().size += amount;
         } else {
             let pop_id = world.insert(Pop {
-                id: None,
+                id: PopId::uninit(),
                 size: amount,
                 farmed_good: Some(Wheat),
                 culture: pop.get().culture.clone(),
@@ -884,12 +774,16 @@ pub trait IronId {
     fn new(id: usize, inner: IronIdInner<Self::Target>) -> Self;
     fn num(&self) -> usize;
     fn get_inner(&self) -> &IronIdInner<Self::Target>;
+    fn factor_ref(&self) -> FactorRef;
     fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
     where
         F: Fn(Self, &World) -> String + 'static,
         Self: Sized + Clone,
     {
         InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
+    }
+    fn factor(&self, world: &World, ftype: FactorType) -> f32 {
+        world.formula_system.get_factor(&(self.factor_ref(), ftype))
     }
 }
 

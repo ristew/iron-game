@@ -80,7 +80,7 @@ pub fn generate_world(world: &mut World) {
 pub fn create_test_world(world: &mut World) {
     generate_world(world);
     let religion_id = world.insert(Religion {
-        id: None,
+        id: ReligionId::uninit(),
         name: "Test Religion".to_owned(),
     });
 
@@ -89,7 +89,7 @@ pub fn create_test_world(world: &mut World) {
     let culture_name = language.generate_name(2);
     let language_id = world.insert(language);
     let culture_id = world.insert(Culture {
-        id: None,
+        id: CultureId::uninit(),
         name: culture_name,
         language: language_id.clone(),
         religion: religion_id.clone(),
@@ -119,7 +119,7 @@ pub fn add_polity(world: &mut World, name: String, culture_id: CultureId, level:
     let age = positive_isample(8, 45);
     let leader = culture_id.get().generate_character(Sex::Male, age, world);
     world.insert(Polity {
-        id: None,
+        id: PolityId::uninit(),
         name,
         primary_culture: culture_id.clone(),
         capital: None,

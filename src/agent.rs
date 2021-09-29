@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, mem::MaybeUninit};
 
 use crate::*;
 
@@ -16,7 +16,7 @@ pub enum CharacterFeature {
 
 #[iron_data]
 pub struct Character {
-    pub id: Option<CharacterId>,
+    pub id: MaybeUninit<CharacterId>,
     pub name: String,
     pub birthday: Date,
     pub sex: Sex,
