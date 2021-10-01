@@ -65,7 +65,7 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #name_id {
-            pub fn get<'a>(&'a self) -> impl std::ops::Deref<Target = <Self as IronId>::Target> + 'a {
+            pub fn get<'a>(&'a self) -> std::cell::Ref<'a, #name> {
                 self.get_inner().borrow()
             }
 
@@ -87,6 +87,43 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+#[proc_macro_derive(IronId)]
+pub fn iron_id_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let target = format_ident!("{}", name.to_string().replace("Id", ""));
+    let generics = input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let expanded = quote! {
+        impl #impl_generics crate::game::IronId for #name #ty_generics #where_clause {
+            type Target = #target;
+
+            fn new(num: usize, inner: IronIdInner<Self::Target>) -> Self {
+                Self {
+                    num,
+                    inner,
+                }
+            }
+
+            fn num(&self) -> usize {
+                self.num
+            }
+
+            fn get_inner<'a>(&'a self) -> &'a IronIdInner<Self::Target> {
+                &self.inner
+            }
+
+            fn factor_ref(&self) -> FactorRef {
+                FactorRef::#target(self.clone())
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+
 #[proc_macro_derive(IronData)]
 pub fn iron_data_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -101,12 +138,12 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
             type IdType = #name_id;
             // type StorageType = crate::storage::Storage<Object = #name>;
 
-            fn id(&self) -> Self::IdType {
-                crate::Id::new()
+            fn id(&self, world: &World) -> Self::IdType {
+                world.storages.get_storage::<Self::DataType>().get_id(self.id)
             }
 
-            fn set_id(&mut self, id: Self::IdType) {
-                self.id = id.clone();
+            fn set_id(&mut self, id: usize) {
+                self.id = id;
             }
         }
     };

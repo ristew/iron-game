@@ -1,12 +1,4 @@
-use std::{
-    any::TypeId,
-    cell::{Ref, RefCell},
-    collections::HashMap,
-    fmt::Debug,
-    hash::Hash,
-    marker::PhantomData,
-    rc::Rc,
-};
+use std::{any::TypeId, cell::{Ref, RefCell}, collections::{HashMap, hash_map::Values}, fmt::Debug, hash::Hash, marker::PhantomData, rc::Rc};
 
 use anymap::AnyMap;
 use ggez::{
@@ -144,6 +136,10 @@ impl World {
         }
     }
 
+    pub fn iter_storage<T>(&self) -> Values<'_, usize, T::IdType> where T: IronData + 'static {
+        self.storages.get_storage::<T>().id_map.values()
+    }
+
     pub fn pixel_to_province(&self, pixel: Point2) -> Option<ProvinceId> {
         let coord = Coordinate::from_pixel_pos(pixel, &self.camera);
         self.get_province_coordinate(coord)
@@ -155,23 +151,22 @@ fn random_place_name(culture: CultureId) -> String {
 }
 
 pub fn pops_yearly_growth(world: &World) {
-    for pop_ref in world.storages.get_storage::<Pop>().id_map.values() {
-        let pop_rc = pop_ref.upgrade().unwrap();
+    for pop in world.iter_storage::<Pop>() {
         // println!("pop size: {}", pop_rc.borrow().size);
-        let babies = positive_isample(2, pop_rc.borrow().size * 4 / 100);
-        let deaths = positive_isample(2, pop_rc.borrow().size / 50);
+        let babies = positive_isample(2, pop.get().size * 4 / 100);
+        let deaths = positive_isample(2, pop.get().size / 50);
         // println!("babies {} deaths {} size {}", babies, deaths, pop_rc.borrow().size);
         world.add_command(Box::new(PopGrowthCommand {
             babies,
             deaths,
-            pop: pop_rc.borrow().id().clone(),
+            pop: pop.clone(),
         }));
     }
     world.add_command(Box::new(UpdateWorldPopulation));
 }
 
 pub fn harvest_provinces(world: &World) {
-    for province in world.storages.get_storage::<Province>().ids.iter() {
+    for province in world.iter_storage::<Province>() {
         if world.date.month() == province.get().harvest_month {
             for settlement in province.get().settlements.iter() {
                 for pop in settlement.get().pops.iter() {
@@ -185,7 +180,7 @@ pub fn harvest_provinces(world: &World) {
 pub fn day_tick(world: &World) {
     if world.date.is_year() {
         pops_yearly_growth(world);
-        for character in world.storages.get_storage::<Character>().ids.iter() {
+        for character in world.iter_storage::<Character>() {
             if character.get().death.is_none() && character.get().birthday.age(world.date) as f32 > character.get().health {
                 world.events.add(Rc::new(CharacterDiedEvent(character.clone())));
             }
@@ -194,8 +189,8 @@ pub fn day_tick(world: &World) {
 
     if world.date.is_month() {
         harvest_provinces(world);
-        for pop in world.storages.get_storage::<Pop>().rcs.iter() {
-            world.add_command(Box::new(PopEatCommand(pop.borrow().id().clone())));
+        for pop in world.iter_storage::<Pop>() {
+            world.add_command(Box::new(PopEatCommand(pop.clone())));
         }
     }
 }

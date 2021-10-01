@@ -14,16 +14,24 @@ pub enum CharacterFeature {
     Idiot,
 }
 
-#[iron_data]
+pub enum Title {
+    PolityLeader(PolityId),
+    SettlementLeader(SettlementId),
+}
+
+#[derive(IronData)]
 pub struct Character {
-    pub id: MaybeUninit<CharacterId>,
+    pub id: usize,
     pub name: String,
     pub birthday: Date,
     pub sex: Sex,
     pub health: f32,
     pub death: Option<Date>,
     pub features: HashSet<CharacterFeature>,
+    pub titles: Vec<Title>,
 }
+
+gen_id!(Character, CharacterId);
 
 impl Featured<CharacterFeature> for Character {
     fn has_feature(&self, feature: CharacterFeature) -> bool {

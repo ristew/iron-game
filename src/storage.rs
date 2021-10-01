@@ -58,8 +58,9 @@ pub trait Storage {
     fn new() -> Self
     where
         Self: Sized;
-    fn insert(&mut self, item: Self::Object);
-    fn get_id(&mut self) -> usize;
+    fn insert(&mut self, item: Self::Object) -> Self::Id;
+    fn new_id(&mut self) -> usize;
+    fn get_id(&self, id_num: usize) -> Self::Id;
     fn remove(&mut self, id: &Self::Id);
 }
 
@@ -75,89 +76,69 @@ pub trait Storage {
 //     }
 // }
 
-pub struct ObjectStorage<T, Id>
+pub struct ObjectStorage<Id>
 where
-    T: IronData,
+    Id: IronId
 {
     id_ctr: usize,
-    pub rcs: Vec<Rc<RefCell<T>>>,
-    pub id_map: HashMap<usize, Weak<RefCell<T>>>,
-    pub ids: Vec<Id>,
-    _fake: PhantomData<Id>,
+    pub id_map: HashMap<usize, Id>,
 }
 
-impl<T, Id> ObjectStorage<T, Id>
+impl<Id> ObjectStorage<Id>
 where
-    T: IronData<IdType = Id>,
-    Id: IronId<Target = T> + Clone,
+    Id: IronId + Clone,
 {
     pub fn has_id(&self, id: &Id) -> bool {
         self.id_map.contains_key(&id.num())
     }
 
     fn insert_id(&mut self, id: Id) {
-        rc.borrow_mut().set_id(id.clone());
-
-        self.rcs.push(rc.clone());
         self.id_map
-            .insert((*rc).borrow().id().num(), Rc::downgrade(&rc));
-        self.ids.push(id.clone());
-        let x = (*rc).borrow();
-        x.id()
+            .insert(id.num(), id);
     }
 }
 
-impl<T, Id> Storage for ObjectStorage<T, Id>
+impl<Id> Storage for ObjectStorage<Id>
 where
-    T: IronData<IdType = Id>,
-    Id: IronId<Target = T> + Debug + Clone,
+    Id: IronId + Debug + Clone,
 {
-    type Object = T;
+    type Object = Id::Target;
     type Id = Id;
 
     fn new() -> Self {
         Self::default()
     }
-    fn insert(&mut self, data: T) -> Id {
+    fn insert(&mut self, mut data: Id::Target) -> Id {
+        let id_num = self.new_id();
+        data.set_id(id_num);
         let rc = Rc::new(RefCell::new(data));
-        let id = Self::Id::new(self.get_storage_mut::<T>().get_id(), IronIdInner(rc.clone()));
+        let id = Self::Id::new(id_num, IronIdInner(rc.clone()));
         self.insert_id(id.clone());
         id
     }
 
-    fn get_id(&mut self) -> usize {
+    fn new_id(&mut self) -> usize {
         self.id_ctr += 1;
         self.id_ctr
     }
 
+    fn get_id(&self, id_num: usize) -> Id {
+        self.id_map.get(&id_num).unwrap().clone()
+    }
+
     fn remove(&mut self, id: &Self::Id) {
         self.id_map.remove(&id.num());
-        for removed in self
-            .rcs
-            .drain_filter(|item| item.borrow().id().num() == id.num())
-        {
-            // println!("removed item: {:?}", removed.borrow().id());
-        }
-        for removed in self
-            .ids
-            .drain_filter(|oid| oid.num() == id.num())
-        {
-            // println!("removed item: {:?}", removed.borrow().id());
-        }
     }
 }
 
-impl<T, Id> Default for ObjectStorage<T, Id>
+impl<Id> Default for ObjectStorage<Id>
 where
-    T: IronData,
+    Id: IronId,
 {
     fn default() -> Self {
         Self {
             id_ctr: 0,
-            rcs: Vec::new(),
-            ids: Vec::new(),
             id_map: HashMap::new(),
-            _fake: Default::default(),
         }
     }
 }
@@ -167,24 +148,24 @@ pub struct Storages {
 }
 
 impl Storages {
-    pub fn get_storage<T>(&self) -> &ObjectStorage<T, T::IdType>
+    pub fn get_storage<T>(&self) -> &ObjectStorage<T::IdType>
     where
         T: IronData + 'static,
     {
         self.storages
             .get(&StorageType::match_type::<T>())
             .unwrap()
-            .downcast_ref::<ObjectStorage<T, T::IdType>>()
+            .downcast_ref::<ObjectStorage<T::IdType>>()
             .unwrap()
     }
-    pub fn get_storage_mut<T>(&mut self) -> &mut ObjectStorage<T, T::IdType>
+    pub fn get_storage_mut<T>(&mut self) -> &mut ObjectStorage<T::IdType>
     where
         T: IronData + 'static,
     {
         self.storages
             .get_mut(&StorageType::match_type::<T>())
             .unwrap()
-            .downcast_mut::<ObjectStorage<T, T::IdType>>()
+            .downcast_mut::<ObjectStorage<T::IdType>>()
             .unwrap()
     }
     // pub fn get_ref<T>(&self, id: &T::IdType) -> IronIdInner<T>
@@ -197,8 +178,7 @@ impl Storages {
     where
         T: IronData + 'static,
     {
-        self.get_storage_mut::<T>().insert(id.clone());
-        id
+        self.get_storage_mut::<T>().insert(data)
     }
 
     pub fn remove<T>(&mut self, id: &T::IdType)
@@ -209,11 +189,18 @@ impl Storages {
 
     }
 
-    pub fn get_id<T>(&mut self) -> usize
+    pub fn new_id<T>(&mut self) -> usize
     where
         T: IronData + 'static,
     {
-        self.get_storage_mut::<T>().get_id()
+        self.get_storage_mut::<T>().new_id()
+    }
+
+    pub fn get_id<T>(&self, id_num: usize) -> T::IdType
+    where
+        T: IronData + 'static
+    {
+        self.get_storage::<T>().get_id(id_num)
     }
 }
 
@@ -224,7 +211,7 @@ impl Default for Storages {
             ( $typ:ident ) => {
                 storages.insert(
                     StorageType::$typ,
-                    Box::new(ObjectStorage::<$typ, <$typ as IronData>::IdType>::new()),
+                    Box::new(ObjectStorage::<<$typ as IronData>::IdType>::new()),
                 );
             }
         }

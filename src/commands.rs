@@ -170,7 +170,8 @@ impl Command for PolityUpdateLeaderCommand {
         };
         let old_leader = self.0.get().leader.clone();
         self.0.get_mut().leader = leader.clone();
-        println!("change leader: {} to {}", old_leader.get().title(world), leader.get().title(world));
+        leader.get_mut().titles.push(Title::PolityLeader(self.0.clone()));
+        // println!("change leader: {} to {}", old_leader.get().title(world), leader.get().title(world));
     }
 }
 
@@ -184,7 +185,8 @@ impl Command for SettlementUpdateHeadmanCommand {
         };
         let old_headman = self.0.get().headman.clone();
         self.0.get_mut().headman = headman.clone();
-        println!("{:?} change headman: {} to {}", world.date, old_headman.get().title(world), headman.get().title(world));
+        headman.get_mut().titles.push(Title::SettlementLeader(self.0.clone()));
+        // println!("{:?} change headman: {} to {}", world.date, old_headman.get().title(world), headman.get().title(world));
     }
 }
 
@@ -227,7 +229,7 @@ pub struct ZoomCameraCommand(pub f32);
 
 impl Command for ZoomCameraCommand {
     fn run(&self, world: &mut World) {
-        world.camera.zoom = (world.camera.zoom + self.0).max(0.25).min(2.0);
+        world.camera.zoom = (world.camera.zoom * self.0).max(0.1).min(MAP_SIZE as f32 / 50.0);
     }
 }
 
@@ -308,7 +310,7 @@ pub struct UpdateWorldPopulation;
 
 impl Command for UpdateWorldPopulation {
     fn run(&self, world: &mut World) {
-        let new_total = world.storages.get_storage::<Pop>().ids.iter().fold(0, |acc, pop| acc + pop.get().size);
+        let new_total = world.iter_storage::<Pop>().fold(0, |acc, pop| acc + pop.get().size);
         world.population = new_total;
     }
 }

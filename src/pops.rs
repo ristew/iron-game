@@ -3,7 +3,7 @@ use rand::{Rng, distributions::Slice, prelude::IteratorRandom, random, thread_rn
 use rand_distr::Uniform;
 
 use crate::*;
-use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash, mem::MaybeUninit, rc::Rc, rc::Weak};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
 
 #[derive(Clone, Debug)]
 pub struct MigrationStatus {
@@ -13,9 +13,9 @@ pub struct MigrationStatus {
     pub settlement: Option<SettlementId>,
 }
 
-#[iron_data]
+#[derive(IronData)]
 pub struct Pop {
-    pub id: MaybeUninit<PopId>,
+    pub id: usize,
     pub size: isize,
     pub culture: CultureId,
     pub settlement: SettlementId,
@@ -27,6 +27,8 @@ pub struct Pop {
     pub migration_status: Option<MigrationStatus>,
     pub polity: PolityId,
 }
+
+gen_id!(Pop, PopId);
 
 impl Pop {
     pub fn good_satiety(&self, good: GoodType) -> Satiety {
@@ -110,7 +112,7 @@ pub fn harvest(pop: &PopId, world: &World) {
 
 #[iron_data]
 pub struct Language {
-    pub id: MaybeUninit<LanguageId>,
+    pub id: usize,
     pub name: String,
     pub vowels: Vec<String>,
     pub initial_consonants: Vec<String>,
@@ -162,7 +164,7 @@ impl Language {
         let end_consonants = list_filter_chance(&consonants, 0.50);
 
         Self {
-            id: PopId::uninit(),
+            id: 0,
             name: "".to_owned(),
             vowels,
             initial_consonants,
@@ -201,7 +203,7 @@ pub enum CultureFeature {
 
 #[iron_data]
 pub struct Culture {
-    pub id: MaybeUninit<CultureId>,
+    pub id: usize,
     pub name: String,
     pub religion: ReligionId,
     pub language: LanguageId,
@@ -211,19 +213,20 @@ pub struct Culture {
 impl Culture {
     pub fn generate_character(&self, sex: Sex, age: isize, world: &mut World) -> CharacterId {
         world.insert(Character {
-            id: CharacterId::uninit(),
+            id: 0,
             name: format!("{} {}", self.language.get().generate_name(2), self.language.get().generate_name(2)),
             birthday: Date { day: world.date.day - (360 * age + (0..359).choose(&mut thread_rng()).unwrap()) as usize },
             sex,
             health: dev_mean_sample(5.0, 60.0) as f32,
             death: None,
             features: HashSet::new(),
+            titles: Vec::new(),
         })
     }
 }
 
 #[iron_data]
 pub struct Religion {
-    pub id: MaybeUninit<ReligionId>,
+    pub id: usize,
     pub name: String,
 }

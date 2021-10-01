@@ -52,10 +52,10 @@ impl Overlay for PopOverlay {
         let mut province_pops: HashMap<ProvinceId, isize> = HashMap::new();
         let (w, h) = tile_sizes();
         let mut max_pop = 0;
-        for province in world.storages.get_storage::<Province>().rcs.iter() {
-            let pop = province.borrow().population(world);
+        for province in world.iter_storage::<Province>() {
+            let pop = province.get().population(world);
             max_pop = max_pop.max(pop);
-            province_pops.insert(province.borrow().id(), pop);
+            province_pops.insert(province.clone(), pop);
         }
         for (province_id, population) in province_pops.iter() {
             // println!("add hex to overlay map");
@@ -156,22 +156,15 @@ impl RenderContext {
     }
 
     pub fn generate_province_meshes(&mut self, world: &World, ctx: &mut Context) {
-        for province in world
-            .storages
-            .get_storage::<Province>()
-            .rcs
-            .iter()
-            .map(|rc| rc.borrow())
-        {
-            let mesh_key = province.id();
-            if !self.province_meshes.contains(&mesh_key) {
+        for province in world.iter_storage::<Province>() {
+            if !self.province_meshes.contains(&province) {
                 self.generate_province_mesh(&province, world, ctx);
             }
         }
     }
-    fn generate_province_mesh(&mut self, province: &Province, world: &World, ctx: &mut Context) {
+    fn generate_province_mesh(&mut self, province: &ProvinceId, world: &World, ctx: &mut Context) {
         let (w, h) = tile_sizes();
-        let province_pixel_pos = province.coordinate.base_pixel_pos();
+        let province_pixel_pos = province.get().coordinate.base_pixel_pos();
         let hex_dest = [
             province_pixel_pos.x - w / 2.0,
             province_pixel_pos.y - h / 2.0,
@@ -179,10 +172,10 @@ impl RenderContext {
         self.mesh_map.add(
             DrawParam::new()
                 .dest(hex_dest)
-                .color(province.terrain.color()),
+                .color(province.get().terrain.color()),
         );
         self.outline_map.add(DrawParam::new().dest(hex_dest));
-        self.province_meshes.insert(province.id());
+        self.province_meshes.insert(province.clone());
     }
 
     fn camera_matrix(&self, world: &World) -> ColumnMatrix4<f32> {

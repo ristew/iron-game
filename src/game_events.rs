@@ -264,7 +264,7 @@ impl Event for MouseWheelEvent {
     }
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
-        vec![Box::new(ZoomCameraCommand(-self.0 * 0.05))]
+        vec![Box::new(ZoomCameraCommand(1.0 - self.0 * 0.1))]
     }
 }
 
@@ -348,16 +348,20 @@ impl Event for CharacterDiedEvent {
     }
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
-        println!("character died: {}", self.0.get().title(world));
+        // println!("character died: {}", self.0.get().title(world));
         let mut commands: Vec<Box<dyn Command>> = Vec::new();
-        for polity in world.storages.get_storage::<Polity>().ids.iter() {
-            if polity.get().leader == self.0 {
-                commands.push(Box::new(PolityUpdateLeaderCommand(polity.clone())));
-            }
-        }
-        for settlement in world.storages.get_storage::<Settlement>().ids.iter() {
-            if settlement.get().headman == self.0 {
-                commands.push(Box::new(SettlementUpdateHeadmanCommand(settlement.clone())));
+        for title in self.0.get().titles.iter() {
+            match title {
+                Title::PolityLeader(polity) => {
+                    if polity.get().leader == self.0 {
+                        commands.push(Box::new(PolityUpdateLeaderCommand(polity.clone())));
+                    }
+                },
+                Title::SettlementLeader(settlement) => {
+                    if settlement.get().headman == self.0 {
+                        commands.push(Box::new(SettlementUpdateHeadmanCommand(settlement.clone())));
+                    }
+                },
             }
         }
         commands.push(Box::new(KillCharacterCommand(self.0.clone())));

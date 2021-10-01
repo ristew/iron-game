@@ -7,7 +7,7 @@ use ggez::{
 };
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, random, thread_rng};
-use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, mem::MaybeUninit, ops::{Deref, DerefMut}, rc::{Rc, Weak}, sync::Arc, time::Duration};
+use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, sync::Arc, time::Duration};
 use parking_lot::RwLock;
 pub use GoodType::*;
 
@@ -335,7 +335,7 @@ pub enum ProvinceFeature {
 use SettlementFeature::*;
 #[iron_data]
 pub struct Province {
-    pub id: MaybeUninit<ProvinceId>,
+    pub id: usize,
     pub settlements: Vec<SettlementId>,
     pub terrain: Terrain,
     pub climate: Climate,
@@ -482,7 +482,7 @@ pub enum SuccessorLaw {
 
 #[iron_data]
 pub struct Polity {
-    pub id: MaybeUninit<PolityId>,
+    pub id: usize,
     pub name: String,
     pub primary_culture: CultureId,
     pub capital: Option<SettlementId>,
@@ -566,7 +566,7 @@ impl Featured<SettlementFeature> for Settlement {
 impl Settlement {
     pub fn carrying_capacity(&self, world: &World) -> f32 {
         // world.formula_system.get_factor(&(self.id.unwrap().factor_ref(), FactorType::SettlementCarryingCapacity))
-        0.0
+        100.0
     }
 
     pub fn population(&self, world: &World) -> isize {
@@ -583,16 +583,16 @@ impl Settlement {
     // }
 
     pub fn accept_migrants(&mut self, world: &mut World, pop: PopId, amount: isize) {
-        println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
+        // println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
         if let Some(dpop) = self.pops.iter().find(|p| p.get().culture == pop.get().culture) {
             dpop.get_mut().size += amount;
         } else {
             let pop_id = world.insert(Pop {
-                id: PopId::uninit(),
+                id: 0,
                 size: amount,
                 farmed_good: Some(Wheat),
                 culture: pop.get().culture.clone(),
-                settlement: self.id().clone(),
+                settlement: self.id(world).clone(),
                 province: self.province.clone(),
                 satiety: Satiety {
                     base: 0.0,
@@ -761,10 +761,10 @@ impl <T> IronIdInner<T> {
     pub fn get_inner_ref<'a>(&'a self) -> impl Deref<Target = T> + 'a {
         self.0.borrow()
     }
-    pub fn borrow<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+    pub fn borrow<'a>(&'a self) -> Ref<'a, T> {
         self.0.borrow()
     }
-    pub fn borrow_mut<'a>(&'a self) -> impl DerefMut<Target = T> + 'a {
+    pub fn borrow_mut<'a>(&'a self) -> RefMut<'a, T> {
         self.0.borrow_mut()
     }
 }
@@ -787,12 +787,55 @@ pub trait IronId {
     }
 }
 
+#[macro_export]
+macro_rules! gen_id {
+	($data:ident,$id:ident) => {
+        #[derive(IronId, Clone)]
+        pub struct $id {
+            num: usize,
+            inner: IronIdInner<$data>,
+        }
+
+        impl PartialEq for $id {
+            fn eq(&self, other: &Self) -> bool {
+                self.num == other.num
+            }
+        }
+
+        impl Eq for $id {}
+
+        impl std::hash::Hash for $id {
+            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+                self.num.hash(state);
+            }
+        }
+
+        impl std::fmt::Debug for $id {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(format!("{}({})", stringify!($id), self.num).as_str())
+            }
+        }
+
+        // pub type #name_ptr = std::rc::Rc<std::cell::RefCell<#name>>;
+
+        impl $id {
+            pub fn get<'a>(&'a self) -> std::cell::Ref<'a, $data> {
+                self.get_inner().borrow()
+            }
+
+            pub fn get_mut<'a>(&'a self) -> std::cell::RefMut<'a, $data> {
+                self.get_inner().borrow_mut()
+            }
+        }
+	};
+}
+
 pub trait IronData {
     type DataType;
     type IdType: IronId<Target = Self> + Debug + Clone;
 
-    fn id(&self) -> Self::IdType;
-    fn set_id(&mut self, id: Self::IdType);
+    fn id(&self, world: &World) -> Self::IdType;
+    fn set_id(&mut self, id: usize);
 }
 
 pub struct MainState {
@@ -831,7 +874,7 @@ impl EventHandler<GameError> for MainState {
         if timer::delta(ctx).as_secs_f32() < FRAME_TIME {
             timer::sleep(Duration::from_secs_f32(FRAME_TIME) - timer::delta(ctx));
         }
-        for i in 0..25 {
+        // for i in 0..25 {
             self.frame += 1;
             if self.target_speed > 0 && self.frame % self.target_speed == 0 {
                 self.world.date.day += 1;
@@ -849,7 +892,7 @@ impl EventHandler<GameError> for MainState {
             }
             self.world.process_events();
             self.world.process_command_queue();
-        }
+        // }
         timer::yield_now();
         Ok(())
     }

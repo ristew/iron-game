@@ -7,7 +7,7 @@ use rand_distr::Uniform;
 
 use crate::*;
 
-const MAP_SIZE: isize = 100;
+pub const MAP_SIZE: isize = 200;
 
 fn center_dist(coordinate: Coordinate) -> f32 {
     coordinate.dist(Coordinate::new(MAP_SIZE / 4, MAP_SIZE / 2)) as f32
@@ -48,7 +48,7 @@ pub fn generate_world(world: &mut World) {
             Terrain::Ocean
         };
         let province_id = world.insert_province(Province {
-            id: None,
+            id: 0,
             terrain,
             climate: Climate::Mild,
             coordinate,
@@ -80,7 +80,7 @@ pub fn generate_world(world: &mut World) {
 pub fn create_test_world(world: &mut World) {
     generate_world(world);
     let religion_id = world.insert(Religion {
-        id: ReligionId::uninit(),
+        id: 0,
         name: "Test Religion".to_owned(),
     });
 
@@ -89,7 +89,7 @@ pub fn create_test_world(world: &mut World) {
     let culture_name = language.generate_name(2);
     let language_id = world.insert(language);
     let culture_id = world.insert(Culture {
-        id: CultureId::uninit(),
+        id: 0,
         name: culture_name,
         language: language_id.clone(),
         religion: religion_id.clone(),
@@ -97,8 +97,8 @@ pub fn create_test_world(world: &mut World) {
     });
 
     // create provinces
-    for i in 0..100 {
-        for j in 0..100 {
+    for i in 0..MAP_SIZE {
+        for j in 0..MAP_SIZE {
             let coordinate = Coordinate::new(i - (j / 2), j);
 
             let province_id = world.get_province_coordinate(coordinate).unwrap();
@@ -119,7 +119,7 @@ pub fn add_polity(world: &mut World, name: String, culture_id: CultureId, level:
     let age = positive_isample(8, 45);
     let leader = culture_id.get().generate_character(Sex::Male, age, world);
     world.insert(Polity {
-        id: PolityId::uninit(),
+        id: 0,
         name,
         primary_culture: culture_id.clone(),
         capital: None,
@@ -142,7 +142,7 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
     };
 
     let settlement_id = world.insert_settlement(Settlement {
-        id: None,
+        id: 0,
         name: culture_id.get().language.get().generate_name(4),
         pops: vec![],
         features: HashSet::new(),
@@ -154,7 +154,7 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
         successor_law: SuccessorLaw::Election,
     });
     let pop_id = world.insert(Pop {
-        id: None,
+        id: 0,
         size,
         farmed_good: Some(Wheat),
         culture: culture_id.clone(),
