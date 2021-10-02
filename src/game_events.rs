@@ -429,7 +429,7 @@ impl Event for CharacterDiedEvent {
     fn short_description(&self, world: &World) -> String {
         let c = self.0.get();
         // no reanimation!!
-        format!("{} died.  They were {} years.", c.title(world), c.birthday.age(c.death.unwrap_or(world.date)))
+        format!("{} died.  They were {}.", c.title(world), c.birthday.age(c.death.unwrap_or(world.date)))
     }
 }
 
