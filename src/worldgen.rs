@@ -118,15 +118,17 @@ pub fn create_test_world(world: &mut World) {
 pub fn add_polity(world: &mut World, name: String, culture_id: CultureId, level: PolityLevel) -> PolityId {
     let age = positive_isample(8, 45);
     let leader = culture_id.get().generate_character(Sex::Male, age, world);
-    world.insert(Polity {
+    let polity_id = world.insert(Polity {
         id: 0,
         name,
         primary_culture: culture_id.clone(),
         capital: None,
         level: PolityLevel::Tribe,
-        leader,
+        leader: leader.clone(),
         successor_law: SuccessorLaw::Election,
-    })
+    });
+    leader.get_mut().titles.push(Title::PolityLeader(polity_id.clone()));
+    polity_id
 }
 
 fn add_test_settlement(world: &mut World, culture_id: CultureId, province_id: ProvinceId, polity_id: PolityId) -> SettlementId {

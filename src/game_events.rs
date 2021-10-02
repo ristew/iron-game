@@ -17,13 +17,27 @@ pub enum EventKind {
     MigrationDone,
     PopDestroyed,
     CharacterDied,
+    PolityLeaderDied,
+}
+
+impl EventKind {
+    pub fn should_log(self) -> bool {
+        match self {
+            EventKind::KeyDown => false,
+            EventKind::KeyUp => false,
+            EventKind::KeyHeld => false,
+            EventKind::MouseWheel => false,
+            EventKind::MouseButtonDown => false,
+            _ => true,
+        }
+    }
 }
 
 pub trait Event {
     fn kind(&self) -> EventKind;
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>>;
     fn subjects(&self) -> Vec<GameId>;
-    fn short_description(&self) -> String {
+    fn short_description(&self, world: &World) -> String {
         format!("{:?} {:?}", self.kind(), self.subjects())
     }
 }
@@ -338,6 +352,10 @@ impl Event for PopStarveEvent {
     fn subjects(&self) -> Vec<GameId> {
         self.pop.gids()
     }
+
+    fn short_description(&self, world: &World) -> String {
+        format!("{} adults and {} children starved in {}.", self.amount, self.children, self.pop.get().settlement.get().name)
+    }
 }
 
 pub struct MigrationDoneEvent(pub PopId);
@@ -369,6 +387,10 @@ impl Event for MigrationDoneEvent {
 
     fn subjects(&self) -> Vec<GameId> {
         self.0.gids()
+    }
+
+    fn short_description(&self, world: &World) -> String {
+        format!("{} {} are migrating to a new province.", self.0.get().size, self.0.get().culture.get().name)
     }
 }
 
@@ -402,6 +424,32 @@ impl Event for CharacterDiedEvent {
 
     fn subjects(&self) -> Vec<GameId> {
         self.0.gids()
+    }
+
+    fn short_description(&self, world: &World) -> String {
+        let c = self.0.get();
+        // no reanimation!!
+        format!("{} died.  They were {} years.", c.title(world), c.birthday.age(c.death.unwrap_or(world.date)))
+    }
+}
+
+pub struct PolityLeaderDiedEvent(pub PolityId, pub CharacterId);
+
+impl Event for PolityLeaderDiedEvent {
+    fn kind(&self) -> EventKind {
+        EventKind::PolityLeaderDied
+    }
+
+    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        vec![Box::new(PolityUpdateLeaderCommand(self.0.clone()))]
+    }
+
+    fn subjects(&self) -> Vec<GameId> {
+        vec![self.0.gid(), self.1.gid()]
+    }
+
+    fn short_description(&self, world: &World) -> String {
+        format!("{:?} {:?}", self.kind(), self.subjects())
     }
 }
 

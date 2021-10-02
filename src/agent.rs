@@ -19,6 +19,21 @@ pub enum Title {
     SettlementLeader(SettlementId),
 }
 
+impl Title {
+    pub fn name(&self) -> String {
+        match self {
+            Title::PolityLeader(polity_id) => {
+                let polity = polity_id.get();
+                format!("{} of {}", polity.level.leader_title(), polity.name)
+            },
+            Title::SettlementLeader(settlement_id) => {
+                let settlement = settlement_id.get();
+                format!("Mayor of {}", settlement.name)
+            },
+        }
+    }
+}
+
 #[derive(IronData)]
 pub struct Character {
     pub id: usize,
@@ -49,7 +64,14 @@ impl Featured<CharacterFeature> for Character {
 
 impl Character {
     pub fn title(&self, world: &World) -> String {
-        format!("{}, {}", self.name, self.birthday.age(world.date))
+        let titles = self.titles.iter().map(|t| t.name()).collect::<Vec<_>>();
+        let titles_str = if titles.len() > 0 {
+            format!(", {},", titles.join(", "))
+        } else {
+            "".to_owned()
+        };
+        // no reanimation!!
+        format!("{}{}", self.name, titles_str)
     }
 }
 

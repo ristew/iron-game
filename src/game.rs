@@ -481,6 +481,7 @@ impl Province {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PolityLevel {
     Tribe, // one village
     Chiefdom, // a few villages united under a chief
@@ -488,6 +489,19 @@ pub enum PolityLevel {
     CityState, // ruled from a city with it's surrounding landscape
     Kingdom, // the classic, heriditary monarchy
     Republic, // run by and for a noble class
+}
+
+impl PolityLevel {
+    pub fn leader_title(self) -> &'static str {
+        match self {
+            PolityLevel::Tribe => "Headman",
+            PolityLevel::Chiefdom => "Chief",
+            PolityLevel::Confederacy => "High Chief",
+            PolityLevel::CityState => "Ruler",
+            PolityLevel::Kingdom => "King",
+            PolityLevel::Republic => "Consul",
+        }
+    }
 }
 
 pub enum SuccessorLaw {

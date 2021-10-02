@@ -88,6 +88,9 @@ impl World {
             for command in event.map_event(self).into_iter() {
                 self.add_command(command);
             }
+            if event.kind().should_log() {
+                println!("[{:?}] {}", self.date, event.short_description(self));
+            }
             self.logs.add_log(self.date, event.clone());
         }
     }

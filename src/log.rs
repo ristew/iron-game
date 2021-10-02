@@ -36,9 +36,8 @@ pub struct Logs {
 impl Logs {
     pub fn add_log(&mut self, date: Date, event: Rc<dyn Event>) {
         let subjects = event.subjects();
-        println!("[{:?}] {}", date, event.short_description());
         let log_id = LogId(self.storage.len());
-        println!("{:?}", log_id);
+        // println!("{:?}", log_id);
         self.storage.push(Log::new(event));
         push_map(&self.date_map, date, log_id);
         for &subject in subjects.iter() {
