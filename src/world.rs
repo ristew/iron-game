@@ -6,12 +6,12 @@ use ggez::{
     Context,
 };
 use rand::{thread_rng, Rng};
-use rand_distr::{Standard, Uniform};
+use rand_distr::{Distribution, Standard, Uniform};
 use rayon::prelude::*;
 
 use crate::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Date {
     pub day: usize,
 }
@@ -40,6 +40,10 @@ impl Date {
     pub fn age(&self, now: Date) -> usize {
         (now.day - self.day) / 360
     }
+
+    pub fn add_days(self, days: usize) -> Self {
+        Date { day: self.day + days }
+    }
 }
 
 pub fn parse_path(path: &'static str) {
@@ -56,10 +60,11 @@ pub struct World {
     pub date: Date,
     pub province_coord_map: HashMap<Coordinate, ProvinceId>,
     pub storages: Storages,
-    pub formula_system: FormulaSystem<FactorRef, FactorType>,
+    pub formula_system: FormulaSystem<GameId, FactorType>,
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     pub camera: Camera,
     pub events: Events,
+    pub logs: Logs,
     pub selected_province: Option<ProvinceId>,
     pub population: isize,
 }
@@ -83,6 +88,7 @@ impl World {
             for command in event.map_event(self).into_iter() {
                 self.add_command(command);
             }
+            self.logs.add_log(self.date, event.clone());
         }
     }
 
@@ -130,6 +136,7 @@ impl World {
             commands: Rc::new(RefCell::new(Vec::new())),
             camera: Default::default(),
             events: Default::default(),
+            logs: Default::default(),
             selected_province: Default::default(),
             population: 0,
             // ui_system: Default::default(),
@@ -182,7 +189,11 @@ pub fn day_tick(world: &World) {
         pops_yearly_growth(world);
         for character in world.iter_storage::<Character>() {
             if character.get().death.is_none() && character.get().birthday.age(world.date) as f32 > character.get().health {
-                world.events.add(Rc::new(CharacterDiedEvent(character.clone())));
+                // sic fortuna
+                world.events.add_deferred(
+                    Rc::new(CharacterDiedEvent(character.clone())),
+                    world.date.day + Uniform::from(1..360).sample(&mut thread_rng()),
+                );
             }
         }
     }

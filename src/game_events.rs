@@ -22,6 +22,10 @@ pub enum EventKind {
 pub trait Event {
     fn kind(&self) -> EventKind;
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>>;
+    fn subjects(&self) -> Vec<GameId>;
+    fn short_description(&self) -> String {
+        format!("{:?} {:?}", self.kind(), self.subjects())
+    }
 }
 
 // #[derive(Default)]
@@ -218,6 +222,10 @@ impl Event for KeyDownEvent {
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
         vec![]
     }
+
+    fn subjects(&self) -> Vec<GameId> {
+        vec![]
+    }
 }
 
 pub struct KeyUpEvent {
@@ -231,6 +239,10 @@ impl Event for KeyUpEvent {
     }
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
+        vec![]
+    }
+
+    fn subjects(&self) -> Vec<GameId> {
         vec![]
     }
 }
@@ -254,6 +266,10 @@ impl Event for KeyHeldEvent {
             _ => vec![],
         }
     }
+
+    fn subjects(&self) -> Vec<GameId> {
+        vec![]
+    }
 }
 
 pub struct MouseWheelEvent(pub f32);
@@ -265,6 +281,10 @@ impl Event for MouseWheelEvent {
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
         vec![Box::new(ZoomCameraCommand(1.0 - self.0 * 0.1))]
+    }
+
+    fn subjects(&self) -> Vec<GameId> {
+        vec![]
     }
 }
 
@@ -290,6 +310,10 @@ impl Event for MouseButtonDownEvent {
             vec![]
         }
     }
+
+    fn subjects(&self) -> Vec<GameId> {
+        vec![]
+    }
 }
 
 pub struct PopStarveEvent {
@@ -309,6 +333,10 @@ impl Event for PopStarveEvent {
             pop: self.pop.clone(),
             pressure: (self.amount + self.children / 2) as f32,
         })]
+    }
+
+    fn subjects(&self) -> Vec<GameId> {
+        self.pop.gids()
     }
 }
 
@@ -337,6 +365,10 @@ impl Event for MigrationDoneEvent {
         }
 
 
+    }
+
+    fn subjects(&self) -> Vec<GameId> {
+        self.0.gids()
     }
 }
 
@@ -367,6 +399,10 @@ impl Event for CharacterDiedEvent {
         commands.push(Box::new(KillCharacterCommand(self.0.clone())));
         commands
     }
+
+    fn subjects(&self) -> Vec<GameId> {
+        self.0.gids()
+    }
 }
 
 pub struct PopDestroyedEvent(pub PopId);
@@ -378,5 +414,9 @@ impl Event for PopDestroyedEvent {
 
     fn map_event(&self, world: &World) -> Vec<Box<dyn Command>> {
         vec![Box::new(DestroyPopCommand(self.0.clone()))]
+    }
+
+    fn subjects(&self) -> Vec<GameId> {
+        self.0.gids()
     }
 }

@@ -325,6 +325,19 @@ impl<K> FeatureMap<K> where K: Hash + Eq {
     }
 }
 
+pub enum DistrictType {
+    Farmland,
+    Forest,
+    Pasture,
+    Wilderness,
+    Vinyards,
+    Olive,
+}
+
+pub struct District {
+
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ProvinceFeature {
     Fertile,
@@ -333,7 +346,7 @@ pub enum ProvinceFeature {
 }
 
 use SettlementFeature::*;
-#[iron_data]
+#[derive(IronData)]
 pub struct Province {
     pub id: usize,
     pub settlements: Vec<SettlementId>,
@@ -345,6 +358,8 @@ pub struct Province {
     pub controller: Option<PolityId>,
     pub coastal: bool,
 }
+
+gen_id!(Province, ProvinceId);
 
 impl Province {
     pub fn population(&self, world: &World) -> isize {
@@ -480,7 +495,7 @@ pub enum SuccessorLaw {
     Election,
 }
 
-#[iron_data]
+#[derive(IronData)]
 pub struct Polity {
     pub id: usize,
     pub name: String,
@@ -490,6 +505,8 @@ pub struct Polity {
     pub leader: CharacterId,
     pub successor_law: SuccessorLaw,
 }
+
+gen_id!(Polity, PolityId);
 
 #[derive(Clone, Debug)]
 pub struct Site {
@@ -535,7 +552,7 @@ impl SettlementLevel {
     }
 }
 
-#[iron_data]
+#[derive(IronData)]
 pub struct Settlement {
     pub id: usize,
     pub name: String,
@@ -548,6 +565,8 @@ pub struct Settlement {
     pub headman: CharacterId,
     pub successor_law: SuccessorLaw,
 }
+
+gen_id!(Settlement, SettlementId);
 
 impl Featured<SettlementFeature> for Settlement {
     fn has_feature(&self, feature: SettlementFeature) -> bool {
@@ -774,7 +793,7 @@ pub trait IronId {
     fn new(id: usize, inner: IronIdInner<Self::Target>) -> Self;
     fn num(&self) -> usize;
     fn get_inner(&self) -> &IronIdInner<Self::Target>;
-    fn factor_ref(&self) -> FactorRef;
+    fn gid(&self) -> GameId;
     fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
     where
         F: Fn(Self, &World) -> String + 'static,
@@ -783,7 +802,7 @@ pub trait IronId {
         InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
     }
     fn factor(&self, world: &World, ftype: FactorType) -> f32 {
-        world.formula_system.get_factor(&(self.factor_ref(), ftype))
+        world.formula_system.get_factor(&(self.gid(), ftype))
     }
 }
 

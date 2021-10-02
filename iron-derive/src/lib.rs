@@ -13,7 +13,7 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
     let name_id_str = format!("{}", name_id);
 
     let expanded = quote! {
-        #[derive(Clone)]
+        #[derive(IronId, Clone)]
         pub struct #name_id {
             num: usize,
             inner: IronIdInner<#name>,
@@ -40,29 +40,6 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         pub type #name_ptr = std::rc::Rc<std::cell::RefCell<#name>>;
-
-        impl IronId for #name_id {
-            type Target = #name;
-
-            fn new(num: usize, inner: IronIdInner<Self::Target>) -> Self {
-                Self {
-                    num,
-                    inner,
-                }
-            }
-
-            fn num(&self) -> usize {
-                self.num
-            }
-
-            fn get_inner<'a>(&'a self) -> &'a IronIdInner<Self::Target> {
-                &self.inner
-            }
-
-            fn factor_ref(&self) -> FactorRef {
-                FactorRef::#name(self.clone())
-            }
-        }
 
         impl #name_id {
             pub fn get<'a>(&'a self) -> std::cell::Ref<'a, #name> {
@@ -114,8 +91,8 @@ pub fn iron_id_derive(input: TokenStream) -> TokenStream {
                 &self.inner
             }
 
-            fn factor_ref(&self) -> FactorRef {
-                FactorRef::#target(self.clone())
+            fn gid(&self) -> GameId {
+                GameId::#target(self.num())
             }
         }
     };

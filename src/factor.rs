@@ -38,20 +38,36 @@ pub enum FactorDecay {
 }
 
 
-
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum FactorRef {
-    Pop(PopId),
-    Language(LanguageId),
-    Polity(PolityId),
-    Province(ProvinceId),
-    Culture(CultureId),
-    Settlement(SettlementId),
-    Character(CharacterId),
-    Religion(ReligionId),
+impl<T> From<T> for GameId where T: IronId {
+    fn from(r: T) -> Self {
+        r.gid()
+    }
 }
 
-impl FactorSubject for FactorRef {
+pub trait GameIdVecProvider {
+    fn gids(&self) -> Vec<GameId>;
+}
+
+impl<T> GameIdVecProvider for T where T: IronId {
+    fn gids(&self) -> Vec<GameId> {
+        vec![self.gid()]
+    }
+}
+
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub enum GameId {
+    Pop(usize),
+    Language(usize),
+    Polity(usize),
+    Province(usize),
+    Culture(usize),
+    Settlement(usize),
+    Character(usize),
+    Religion(usize),
+}
+
+impl FactorSubject for GameId {
 
 }
 
