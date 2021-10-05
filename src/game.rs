@@ -7,7 +7,7 @@ use ggez::{
 };
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, random, thread_rng};
-use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, sync::Arc, time::Duration};
+use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, slice::Iter, sync::Arc, time::Duration};
 use parking_lot::RwLock;
 pub use GoodType::*;
 
@@ -335,7 +335,24 @@ pub enum DistrictType {
 }
 
 pub struct District {
+    pub dtype: DistrictType,
+    pub modifiers: Vec<DistrictModifier>,
+}
 
+pub struct Districts {
+    inner: [District; 3],
+}
+
+impl Districts {
+    pub fn iter(&self) -> Iter<District> {
+        self.inner.iter()
+    }
+
+    pub fn new(d1: District, d2: District, d3: District) -> Self {
+        Self {
+            inner: [d1, d2, d3]
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]

@@ -102,7 +102,6 @@ pub struct FormulaValue {
     pub dirty: bool,
 }
 
-
 pub struct FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
     factors: DashMap<(S, F), Factor>,
     formulae: Vec<Formula<S, F>>,
