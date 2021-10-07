@@ -195,11 +195,10 @@ pub struct DestroySettlementCommand(pub SettlementId);
 impl Command for DestroySettlementCommand {
     fn run(&self, world: &mut World) {
         // where do we keep track of settlements?
-        self.0.get().province.get_mut().settlements.retain(|s| *s != self.0);
+        self.0.get_mut().ruined = true;
         if Some(self.0.clone()) == self.0.get().controller.get().capital {
             println!("polity over? move capital?");
         }
-        world.remove(&self.0);
     }
 }
 
@@ -252,7 +251,7 @@ impl Command for PopSeekMigrationCommand {
             if let Some(target_province_id) = world.get_province_coordinate(random_point) {
                 let mut target_value = target_province_id.get().base_living_target_value();
 
-                for settlement in target_province_id.get().settlements.iter() {
+                if let Some(settlement) = &target_province_id.get().settlement {
                     target_value -= 1.0;
                     if settlement.get().primary_culture != self.pop.get().culture {
                         target_value -= 2.0;

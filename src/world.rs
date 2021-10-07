@@ -8,10 +8,11 @@ use ggez::{
 use rand::{thread_rng, Rng};
 use rand_distr::{Distribution, Standard, Uniform};
 use rayon::prelude::*;
+use serde::{Serialize, Deserialize};
 
 use crate::*;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Date {
     pub day: usize,
 }
@@ -56,14 +57,20 @@ impl Debug for Date {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct World {
     pub date: Date,
     pub province_coord_map: HashMap<Coordinate, ProvinceId>,
     pub storages: Storages,
+    #[serde(skip)]
     pub formula_system: FormulaSystem<GameId, FactorType>,
+    #[serde(skip)]
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
+    #[serde(skip)]
     pub camera: Camera,
+    #[serde(skip)]
     pub events: Events,
+    #[serde(skip)]
     pub logs: Logs,
     pub selected_province: Option<ProvinceId>,
     pub population: isize,
@@ -111,8 +118,7 @@ impl World {
             .get()
             .province
             .get_mut()
-            .settlements
-            .push(set_id.clone());
+            .settlement = Some(set_id.clone());
         set_id
     }
 
@@ -178,7 +184,7 @@ pub fn pops_yearly_growth(world: &World) {
 pub fn harvest_provinces(world: &World) {
     for province in world.iter_storage::<Province>() {
         if world.date.month() == province.get().harvest_month {
-            for settlement in province.get().settlements.iter() {
+            if let Some(settlement) = &province.get().settlement {
                 for pop in settlement.get().pops.iter() {
                     harvest(pop, world);
                 }

@@ -2,8 +2,10 @@ use std::{hash::Hash, collections::HashMap, sync::Arc};
 
 use dashmap::DashMap;
 use parking_lot::RwLock;
+use serde::{Serialize, Deserialize};
 
 use crate::*;
+
 
 pub struct Log {
     event: Rc<dyn Event>,
@@ -24,7 +26,7 @@ pub fn push_map<K: Eq + Hash>(map: &DashMap<K, Vec<LogId>>, key: K, log_id: LogI
         .push(log_id);
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LogId(usize);
 
 pub struct Logs {

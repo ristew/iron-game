@@ -79,7 +79,7 @@ pub fn iron_id_derive(input: TokenStream) -> TokenStream {
             fn new(num: usize, inner: IronIdInner<Self::Target>) -> Self {
                 Self {
                     num,
-                    inner,
+                    inner: Some(inner),
                 }
             }
 
@@ -88,7 +88,7 @@ pub fn iron_id_derive(input: TokenStream) -> TokenStream {
             }
 
             fn get_inner<'a>(&'a self) -> &'a IronIdInner<Self::Target> {
-                &self.inner
+                self.inner.as_ref().unwrap()
             }
 
             fn gid(&self) -> GameId {
@@ -116,7 +116,7 @@ pub fn iron_data_derive(input: TokenStream) -> TokenStream {
             // type StorageType = crate::storage::Storage<Object = #name>;
 
             fn id(&self, world: &World) -> Self::IdType {
-                world.storages.get_storage::<Self::DataType>().get_id(self.id)
+                world.storages.get_storage::<Self::IdType>().get_id(self.id)
             }
 
             fn set_id(&mut self, id: usize) {

@@ -181,7 +181,7 @@ fn settlement_list(
         Color::new(0.0, 0.0, 0.0, 0.2),
         Constraints::new(0.0, 0.0, 999.9, 999.9),
     );
-    for settlement_id in province.get().settlements.iter() {
+    if let Some(settlement_id) = &province.get().settlement {
         settlement_list
             .borrow_mut()
             .add_child(settlement_info(settlement_id.clone(), ui_system));

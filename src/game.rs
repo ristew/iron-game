@@ -5,6 +5,7 @@ use ggez::{
     graphics::{clear, present, set_screen_coordinates, Color, Rect},
     timer, Context, GameError,
 };
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, random, thread_rng};
 use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, slice::Iter, sync::Arc, time::Duration};
@@ -14,7 +15,7 @@ pub use GoodType::*;
 pub const TILE_SIZE_X: f32 = 16.0;
 pub const TILE_SIZE_Y: f32 = 16.0;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Coordinate {
     pub x: isize,
     pub y: isize,
@@ -158,7 +159,7 @@ impl Iterator for CoordinateIter {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Terrain {
     Plains,
     Hills,
@@ -215,7 +216,7 @@ impl Terrain {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Climate {
     Tropical,
     Dry,
@@ -223,7 +224,7 @@ pub enum Climate {
     Cold,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum GoodType {
     Wheat,
     Barley,
@@ -325,20 +326,37 @@ impl<K> FeatureMap<K> where K: Hash + Eq {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum DistrictType {
     Farmland,
     Forest,
     Pasture,
     Wilderness,
     Vinyards,
-    Olive,
+    OliveGroves,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum DistrictModifier {
+
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct District {
     pub dtype: DistrictType,
     pub modifiers: Vec<DistrictModifier>,
 }
 
+impl District {
+    pub fn new(dtype: DistrictType) -> Self {
+        Self {
+            dtype,
+            modifiers: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Districts {
     inner: [District; 3],
 }
@@ -355,7 +373,7 @@ impl Districts {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum ProvinceFeature {
     Fertile,
     Infertile,
@@ -363,16 +381,17 @@ pub enum ProvinceFeature {
 }
 
 use SettlementFeature::*;
-#[derive(IronData)]
+#[derive(IronData, Serialize, Deserialize)]
 pub struct Province {
     pub id: usize,
-    pub settlements: Vec<SettlementId>,
+    pub settlement: Option<SettlementId>,
+    pub districts: Districts,
+    pub controller: Option<PolityId>,
     pub terrain: Terrain,
     pub climate: Climate,
     pub coordinate: Coordinate,
     pub features: HashSet<ProvinceFeature>,
     pub harvest_month: usize,
-    pub controller: Option<PolityId>,
     pub coastal: bool,
 }
 
@@ -381,7 +400,7 @@ gen_id!(Province, ProvinceId);
 impl Province {
     pub fn population(&self, world: &World) -> isize {
         let mut total_pop = 0;
-        for settlement_id in self.settlements.iter() {
+        if let Some(settlement_id) = self.settlement.as_ref() {
             total_pop += settlement_id.get().population(world);
         }
         total_pop
@@ -449,20 +468,20 @@ impl Province {
     }
 
     pub fn exp_f(&self, fmap: &mut FeatureMap<SettlementFeature>, f: SettlementFeature, b: f32) {
-        let nf = self.settlements.iter().map(|s| s.get().has_feature(f)).filter(|x| *x).count();
-        fmap.add(f, b.powi(nf as i32 + 1));
+        let nf = self.settlement.as_ref().map(|s| s.get().has_feature(f)).filter(|x| *x).unwrap_or(false) as i32;
+        fmap.add(f, b.powi(nf + 1));
     }
 
     pub fn find_one(&self, fmap: &mut FeatureMap<SettlementFeature>, f: SettlementFeature, p: f32) {
-        let nf = self.settlements.iter().map(|s| s.get().has_feature(f)).filter(|x| *x).count();
-        if nf == 0 {
+        let nf = self.settlement.as_ref().map(|s| s.get().has_feature(f)).filter(|x| *x).unwrap_or(false);
+        if !nf {
             fmap.add(f, p);
         }
     }
 
     pub fn decay_site_factor<F>(&self, b: f32, predicate: F) -> f32 where F: Fn(SettlementId) -> bool {
-        let count = self.settlements.iter().map(|s| predicate(s.clone())).filter(|x| *x).count();
-        (1.0 + b).powi(count as i32 + 1) - 1.0
+        let nf = self.settlement.as_ref().map(|s| predicate(s.clone())).filter(|x| *x).unwrap_or(false);
+        (1.0 + b).powi(nf as i32 + 1) - 1.0
     }
 
     pub fn generate_site(&self, world: &World) -> Site {
@@ -498,7 +517,7 @@ impl Province {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PolityLevel {
     Tribe, // one village
     Chiefdom, // a few villages united under a chief
@@ -521,12 +540,13 @@ impl PolityLevel {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SuccessorLaw {
     Inheritance(CharacterId),
     Election,
 }
 
-#[derive(IronData)]
+#[derive(IronData, Serialize, Deserialize)]
 pub struct Polity {
     pub id: usize,
     pub name: String,
@@ -550,7 +570,7 @@ pub trait Featured<T> where T: Eq + Hash + Sized {
     fn remove_feature(&mut self, feature: T);
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum SettlementFeature {
     Hilltop,
     Riverside,
@@ -562,7 +582,7 @@ pub enum SettlementFeature {
     Infertile,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SettlementLevel {
     Hamlet,
     Village,
@@ -583,7 +603,7 @@ impl SettlementLevel {
     }
 }
 
-#[derive(IronData)]
+#[derive(IronData, Serialize, Deserialize)]
 pub struct Settlement {
     pub id: usize,
     pub name: String,
@@ -595,6 +615,7 @@ pub struct Settlement {
     pub controller: PolityId,
     pub headman: CharacterId,
     pub successor_law: SuccessorLaw,
+    pub ruined: bool,
 }
 
 gen_id!(Settlement, SettlementId);
@@ -633,31 +654,20 @@ impl Settlement {
     // }
 
     pub fn accept_migrants(&mut self, world: &mut World, pop: PopId, amount: isize) {
-        // println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
+        println!("accept_migrants {} {} of {}", self.name, amount, self.population(world));
         if let Some(dpop) = self.pops.iter().find(|p| p.get().culture == pop.get().culture) {
             dpop.get_mut().size += amount;
         } else {
-            let pop_id = world.insert(Pop {
-                id: 0,
-                size: amount,
-                farmed_good: Some(Wheat),
-                culture: pop.get().culture.clone(),
-                settlement: self.id(world).clone(),
-                province: self.province.clone(),
-                satiety: Satiety {
-                    base: 0.0,
-                    luxury: 0.0,
-                },
-                kid_buffer: KidBuffer::new(),
-                owned_goods: GoodStorage(HashMap::new()),
-                migration_status: None,
-                polity: self.controller.clone(),
-            });
+            println!("migrants: move pop over?");
+            pop.get_mut().settlement = self.id(world).clone();
+            pop.get_mut().province = self.province.clone();
+
+            self.pops.push(pop.clone());
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct KidBuffer(VecDeque<isize>);
 
 impl KidBuffer {
@@ -694,7 +704,7 @@ impl KidBuffer {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Serialize, Deserialize)]
 pub struct Satiety {
     pub base: f32,
     pub luxury: f32,
@@ -730,7 +740,7 @@ impl std::ops::Mul<Satiety> for f32 {
         }
     }
 }
-
+#[derive(Serialize, Deserialize)]
 pub struct GoodStorage(pub HashMap<GoodType, f32>);
 
 impl GoodStorage {
@@ -837,13 +847,24 @@ pub trait IronId {
     }
 }
 
+// impl Serialize for PopId {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer {
+//         let mut state = serializer.serialize_struct("PopId", 2)?;
+//         state.serialize_field("num", &self.num());
+//         state.end()
+//     }
+// }
+
 #[macro_export]
 macro_rules! gen_id {
 	($data:ident,$id:ident) => {
-        #[derive(IronId, Clone)]
+        #[derive(IronId, Clone, Serialize, Deserialize)]
         pub struct $id {
             num: usize,
-            inner: IronIdInner<$data>,
+            #[serde(skip)]
+            inner: Option<IronIdInner<$data>>,
         }
 
         impl PartialEq for $id {

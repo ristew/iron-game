@@ -4,6 +4,7 @@ use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::fmt::Debug;
 use crate::*;
+use serde::{Serialize, Deserialize};
 
 pub enum FactorEffectLabel {
 
@@ -31,6 +32,7 @@ pub enum FactorType {
 
 impl FactorField for FactorType {}
 
+#[derive(Serialize, Deserialize)]
 pub enum FactorDecay {
     Linear(f32),
     Exponential(f32),
@@ -55,7 +57,7 @@ impl<T> GameIdVecProvider for T where T: IronId {
 }
 
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
 pub enum GameId {
     Pop(usize),
     Language(usize),
@@ -100,25 +102,29 @@ impl FactorSubject for GameId {
 //     }
 // }
 
-pub enum Factor {
-    Constant(f32),
-    Decay(f32, FactorDecay),
-    Formula(FormulaId),
+#[derive(Serialize, Deserialize)]
+pub struct Factor {
+    level: f32,
+    decay: Option<FactorDecay>,
+    formula: Option<FormulaId>,
 }
 
 impl Factor {
     pub fn decay(&mut self) -> f32 {
-        match self {
-            Factor::Decay(amount, decay) => {
-                let this_decay = match decay {
-                    FactorDecay::Linear(n) => *n,
-                    FactorDecay::Exponential(ref n) => *amount * n,
-                    FactorDecay::None => 0.0,
-                };
-                *amount = (*amount - this_decay).max(0.0);
-                this_decay
-            },
-            _ => 0.0,
+        if let Some(decay) = self.decay {
+            match decay {
+                FactorDecay::Linear(n) => {
+                    if self.level > 0.0 {
+                        self.level = (self.level - n).max(0.0);
+                    }
+                },
+                FactorDecay::Exponential(n) => {
+                    if self.level > 0.0 {
+                        self.level = self.level * (1.0 - n);
+                    }
+                },
+                FactorDecay::None => todo!(),
+            };
         }
     }
 }

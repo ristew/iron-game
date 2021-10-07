@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use rayon::iter::IntoParallelIterator;
 use rayon::vec::IntoIter;
 use std::any::Any;
@@ -11,6 +12,7 @@ use std::{
     hash::Hash,
     rc::{Rc, Weak},
 };
+use serde::{Serialize, Deserialize};
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::*;
@@ -29,21 +31,21 @@ pub enum StorageType {
 
 impl StorageType {
     fn match_type<T: 'static>() -> Self {
-        if TypeId::of::<T>() == TypeId::of::<Pop>() {
+        if TypeId::of::<T>() == TypeId::of::<PopId>() {
             Self::Pop
-        } else if TypeId::of::<T>() == TypeId::of::<Province>() {
+        } else if TypeId::of::<T>() == TypeId::of::<ProvinceId>() {
             Self::Province
-        } else if TypeId::of::<T>() == TypeId::of::<Culture>() {
+        } else if TypeId::of::<T>() == TypeId::of::<CultureId>() {
             Self::Culture
-        } else if TypeId::of::<T>() == TypeId::of::<Religion>() {
+        } else if TypeId::of::<T>() == TypeId::of::<ReligionId>() {
             Self::Religion
-        } else if TypeId::of::<T>() == TypeId::of::<Settlement>() {
+        } else if TypeId::of::<T>() == TypeId::of::<SettlementId>() {
             Self::Settlement
-        } else if TypeId::of::<T>() == TypeId::of::<Language>() {
+        } else if TypeId::of::<T>() == TypeId::of::<LanguageId>() {
             Self::Language
-        } else if TypeId::of::<T>() == TypeId::of::<Polity>() {
+        } else if TypeId::of::<T>() == TypeId::of::<PolityId>() {
             Self::Polity
-        } else if TypeId::of::<T>() == TypeId::of::<Character>() {
+        } else if TypeId::of::<T>() == TypeId::of::<CharacterId>() {
             Self::Character
         } else {
             panic!("could not match Id type to storage, {}", stringify! {T});
@@ -76,6 +78,7 @@ pub trait Storage {
 //     }
 // }
 
+#[derive(Serialize, Deserialize)]
 pub struct ObjectStorage<Id>
 where
     Id: IronId
@@ -143,20 +146,33 @@ where
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Storages {
-    storages: HashMap<StorageType, Box<dyn Any>>,
+    pop_storage: ObjectStorage<PopId>,
+    language_storage: ObjectStorage<LanguageId>,
+    culture_storage: ObjectStorage<CultureId>,
+    religion_storage: ObjectStorage<ReligionId>,
+    province_storage: ObjectStorage<ProvinceId>,
+    polity_storage: ObjectStorage<PolityId>,
+    settlement_storage: ObjectStorage<SettlementId>,
+    character_storage: ObjectStorage<CharacterId>,
 }
 
 impl Storages {
-    pub fn get_storage<T>(&self) -> &ObjectStorage<T::IdType>
+    pub fn get_storage<'a, T>(&'a self) -> &'a impl Storage<Id = T, Object = T::Target>
     where
-        T: IronData + 'static,
+        T: IronId + 'static,
     {
-        self.storages
-            .get(&StorageType::match_type::<T>())
-            .unwrap()
-            .downcast_ref::<ObjectStorage<T::IdType>>()
-            .unwrap()
+        match StorageType::match_type::<T>() {
+            StorageType::Pop => &self.pop_storage,
+            StorageType::Province => &self.province_storage,
+            StorageType::Culture => todo!(),
+            StorageType::Religion => todo!(),
+            StorageType::Settlement => todo!(),
+            StorageType::Language => todo!(),
+            StorageType::Polity => todo!(),
+            StorageType::Character => todo!(),
+        }
     }
     pub fn get_storage_mut<T>(&mut self) -> &mut ObjectStorage<T::IdType>
     where

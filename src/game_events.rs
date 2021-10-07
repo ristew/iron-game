@@ -3,6 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 use ggez::event::KeyCode;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 
 use crate::*;
 
@@ -33,9 +35,14 @@ impl EventKind {
     }
 }
 
+pub struct EventChoice {
+    pub text: String,
+    pub commands: Vec<Box<dyn Command>>,
+}
+
 pub trait Event {
     fn kind(&self) -> EventKind;
-    fn map_event(&self, world: &World) -> Vec<Box<dyn Command>>;
+    fn choices(&self, world: &World) -> Vec<EventChoice>;
     fn subjects(&self) -> Vec<GameId>;
     fn short_description(&self, world: &World) -> String {
         format!("{:?} {:?}", self.kind(), self.subjects())

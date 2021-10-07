@@ -53,10 +53,15 @@ pub fn generate_world(world: &mut World) {
             climate: Climate::Mild,
             coordinate,
             harvest_month: 8,
-            settlements: Vec::new(),
+            settlement: None,
             features: HashSet::new(),
             controller: None,
             coastal: false,
+            districts: Districts::new(
+                District::new(DistrictType::Farmland),
+                District::new(DistrictType::Forest),
+                District::new(DistrictType::Pasture),
+            ),
         });
         if terrain == Terrain::Ocean {
             ocean_map.insert(coordinate);
@@ -154,6 +159,7 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
         controller: polity_id.clone(),
         headman: leader.clone(),
         successor_law: SuccessorLaw::Election,
+        ruined: false,
     });
     let pop_id = world.insert(Pop {
         id: 0,
@@ -178,6 +184,8 @@ pub fn add_settlement(world: &mut World, culture_id: CultureId, province_id: Pro
     if polity_id.get().capital.is_none() {
         polity_id.get_mut().capital = Some(settlement_id.clone());
     }
+
+    leader.get_mut().titles.push(Title::SettlementLeader(settlement_id.clone()));
 
     pop_id
         .get_mut()

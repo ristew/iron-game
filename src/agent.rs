@@ -1,19 +1,21 @@
 use std::{collections::HashSet, mem::MaybeUninit};
+use serde::{Serialize, Deserialize};
 
 use crate::*;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum Sex {
     Male,
     Female,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum CharacterFeature {
     Coward,
     Idiot,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Title {
     PolityLeader(PolityId),
     SettlementLeader(SettlementId),
@@ -34,7 +36,7 @@ impl Title {
     }
 }
 
-#[derive(IronData)]
+#[derive(IronData, Serialize, Deserialize)]
 pub struct Character {
     pub id: usize,
     pub name: String,

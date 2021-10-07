@@ -1,11 +1,12 @@
 use inflector::cases::titlecase::to_title_case;
 use rand::{Rng, distributions::Slice, prelude::IteratorRandom, random, thread_rng};
 use rand_distr::Uniform;
+use serde::{Serialize, Deserialize};
 
 use crate::*;
 use std::{cell::RefCell, collections::{HashMap, HashSet}, fmt::Debug, hash::Hash, rc::Rc, rc::Weak};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MigrationStatus {
     pub migrating: isize,
     pub dest: ProvinceId,
@@ -13,7 +14,7 @@ pub struct MigrationStatus {
     pub settlement: Option<SettlementId>,
 }
 
-#[derive(IronData)]
+#[derive(IronData, Serialize, Deserialize)]
 pub struct Pop {
     pub id: usize,
     pub size: isize,
@@ -110,7 +111,7 @@ pub fn harvest(pop: &PopId, world: &World) {
     }
 }
 
-#[iron_data]
+#[derive(IronData, Serialize, Deserialize)]
 pub struct Language {
     pub id: usize,
     pub name: String,
@@ -119,6 +120,8 @@ pub struct Language {
     pub middle_consonants: Vec<String>,
     pub end_consonants: Vec<String>,
 }
+
+gen_id!(Language, LanguageId);
 
 fn list_filter_chance(list: &Vec<String>, chance: f32) -> Vec<String> {
     list.iter()
@@ -201,7 +204,7 @@ pub enum CultureFeature {
     Seafaring,
 }
 
-#[iron_data]
+#[derive(IronData)]
 pub struct Culture {
     pub id: usize,
     pub name: String,
@@ -209,6 +212,8 @@ pub struct Culture {
     pub language: LanguageId,
     pub features: Vec<CultureFeature>,
 }
+
+gen_id!(Culture, CultureId);
 
 impl Culture {
     pub fn generate_character(&self, sex: Sex, age: isize, world: &mut World) -> CharacterId {
@@ -225,8 +230,10 @@ impl Culture {
     }
 }
 
-#[iron_data]
+#[derive(IronData)]
 pub struct Religion {
     pub id: usize,
     pub name: String,
 }
+
+gen_id!(Religion, ReligionId);

@@ -4,6 +4,7 @@ use std::hash::Hash;
 use dashmap::DashMap;
 use dashmap::mapref::one::RefMut;
 use parking_lot::{Mutex, RwLock};
+use serde::{Serialize, Deserialize};
 
 use crate::*;
 
@@ -38,8 +39,11 @@ pub trait FactorField: Clone + Eq + Hash + Debug {
 //     }
 // }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct FormulaId(usize);
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FormulaName {
+    PopMigrationPull(PopId),
+}
+
 
 pub enum FormulaFn {
     VecArgs(Arc<dyn Fn(Vec<f32>) -> f32 + Send + Sync>),
@@ -105,8 +109,8 @@ pub struct FormulaValue {
 pub struct FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
     factors: DashMap<(S, F), Factor>,
     formulae: Vec<Formula<S, F>>,
-    input_map: HashMap<(S, F), Vec<FormulaId>>,
-    formula_values: DashMap<FormulaId, FormulaValue>,
+    input_map: HashMap<(S, F), Vec<FormulaName>>,
+    formula_values: DashMap<FormulaName, FormulaValue>,
 }
 
 // TODO: don't propogate onto end nodes
@@ -147,7 +151,7 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
         }).unwrap_or(0.0)
     }
 
-    pub fn get_formula(&self, f: &(S, F)) -> FormulaId {
+    pub fn get_formula(&self, f: &(S, F)) -> FormulaName {
         let factor = self.factors.get(f).unwrap();
         match factor.value() {
             Factor::Formula(formula_id) => *formula_id,
@@ -156,7 +160,7 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
     }
 
     // retrieve formulae that change as a result of f changing
-    pub fn get_formulae(&self, f: &(S, F)) -> Vec<FormulaId> {
+    pub fn get_formulae(&self, f: &(S, F)) -> Vec<FormulaName> {
         self
             .input_map
             .get(f)
@@ -187,7 +191,7 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
         }
     }
 
-    fn formula_value(&self, formula_id: FormulaId) -> f32 {
+    fn formula_value(&self, formula_id: FormulaName) -> f32 {
         {
             if let Some(val) = self.formula_values.get(&formula_id) {
                 if !val.dirty {
@@ -215,19 +219,19 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
         res
     }
 
-    fn dirty_formula(&self, formula_id: FormulaId) {
+    fn dirty_formula(&self, formula_id: FormulaName) {
         if let Some(mut val) = self.formula_values.get_mut(&formula_id) {
             val.value_mut().dirty = true;
         }
     }
 
-    fn calc_formula(&self, formula_id: FormulaId) -> f32 {
+    fn calc_formula(&self, formula_id: FormulaName) -> f32 {
         let formula = &self.formulae[formula_id.0];
         let value = formula.calc(self.fetch_inputs(&formula.inputs));
         value
     }
 
-    fn add_input(&mut self, f: &(S, F), formula_id: FormulaId) {
+    fn add_input(&mut self, f: &(S, F), formula_id: FormulaName) {
         self
             .input_map
             .entry(f.clone())
@@ -235,9 +239,9 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
             .push(formula_id);
     }
 
-    pub fn add_formula(&mut self, formula: Formula<S, F>) -> FormulaId {
+    pub fn add_formula(&mut self, formula: Formula<S, F>) -> FormulaName {
         let idx = self.formulae.len();
-        let formula_id = FormulaId(idx);
+        let formula_id = FormulaName(idx);
         for input in formula.inputs.iter() {
             self.add_input(input, formula_id);
         }
