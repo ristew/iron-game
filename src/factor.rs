@@ -18,16 +18,16 @@ pub enum FactorEffect {
 
 
 //TODO: split out into PopFactor eg like FactorRef
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum FactorType {
-    SettlementSize,
-    SettlementCarryingCapacity,
-    SettlementPressure,
+    SettlementSize(SettlementId),
+    SettlementCarryingCapacity(SettlementId),
+    SettlementPressure(SettlementId),
 
-    PopDemand(GoodType),
-    PopPressure,
-    PopSize,
-    PopHarvest,
+    PopDemand(PopId, GoodType),
+    PopPressure(PopId),
+    PopSize(PopId),
+    PopHarvest(PopId),
 }
 
 impl FactorField for FactorType {}
@@ -104,27 +104,47 @@ impl FactorSubject for GameId {
 
 #[derive(Serialize, Deserialize)]
 pub struct Factor {
-    level: f32,
-    decay: Option<FactorDecay>,
-    formula: Option<FormulaId>,
+    pub level: f32,
+    pub decay: Option<FactorDecay>,
+    pub formula: Option<FormulaId>,
 }
 
 impl Factor {
+    pub fn new_formula(formula_id: FormulaId) -> Self {
+        Self {
+            level: 0.0,
+            decay: None,
+            formula: Some(formula_id),
+        }
+    }
+    pub fn new_amount(level: f32) -> Self {
+        Self {
+            level,
+            decay: None,
+            formula: None,
+        }
+    }
     pub fn decay(&mut self) -> f32 {
         if let Some(decay) = self.decay {
             match decay {
                 FactorDecay::Linear(n) => {
+                    let before = self.level;
                     if self.level > 0.0 {
                         self.level = (self.level - n).max(0.0);
                     }
+                    self.level - before
                 },
                 FactorDecay::Exponential(n) => {
+                    let before = self.level;
                     if self.level > 0.0 {
                         self.level = self.level * (1.0 - n);
                     }
+                    self.level - before
                 },
-                FactorDecay::None => todo!(),
-            };
+                FactorDecay::None => 0.0,
+            }
+        } else {
+            0.0
         }
     }
 }

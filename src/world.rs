@@ -63,7 +63,7 @@ pub struct World {
     pub province_coord_map: HashMap<Coordinate, ProvinceId>,
     pub storages: Storages,
     #[serde(skip)]
-    pub formula_system: FormulaSystem<GameId, FactorType>,
+    pub formula_system: FormulaSystem,
     #[serde(skip)]
     pub commands: Rc<RefCell<Vec<Box<dyn Command>>>>,
     #[serde(skip)]

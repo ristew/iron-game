@@ -40,9 +40,7 @@ pub trait FactorField: Clone + Eq + Hash + Debug {
 // }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum FormulaName {
-    PopMigrationPull(PopId),
-}
+pub struct FormulaId(usize);
 
 
 pub enum FormulaFn {
@@ -81,18 +79,16 @@ impl FormulaFn {
     }
 }
 
-pub struct Formula<S, F> where S: FactorSubject, F: FactorField {
-    pub inputs: Vec<(S, F)>,
+pub struct Formula {
+    pub inputs: Vec<FactorType>,
     pub inner_fn: FormulaFn,
-    pub subject: (S, F),
 }
 
-impl<S, F> Formula<S, F> where S: FactorSubject, F: FactorField {
-    pub fn new(inputs: Vec<(S, F)>, inner_fn: FormulaFn, subject: (S, F)) -> Self {
+impl Formula {
+    pub fn new(inputs: Vec<FactorType>, inner_fn: FormulaFn) -> Self {
         Self {
             inputs,
             inner_fn,
-            subject,
         }
     }
 
@@ -106,52 +102,44 @@ pub struct FormulaValue {
     pub dirty: bool,
 }
 
-pub struct FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
-    factors: DashMap<(S, F), Factor>,
-    formulae: Vec<Formula<S, F>>,
-    input_map: HashMap<(S, F), Vec<FormulaName>>,
-    formula_values: DashMap<FormulaName, FormulaValue>,
+pub struct FormulaSystem {
+    factors: DashMap<FactorType, Factor>,
+    formulae: Vec<Formula>,
+    input_map: HashMap<FactorType, Vec<FormulaId>>,
+    formula_values: DashMap<FormulaId, FormulaValue>,
+    formula_subjects: DashMap<FormulaId, FactorType>,
 }
 
 // TODO: don't propogate onto end nodes
-impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
-    pub fn add_factor(&self, f: &(S, F), amount: f32) {
+impl FormulaSystem {
+    pub fn add_factor(&self, f: &FactorType, amount: f32) {
         self.factors.get_mut(f).map(|mut factor| {
-            match factor.value_mut() {
-                Factor::Constant(n) => *n += amount,
-                Factor::Decay(n, _) => *n += amount,
-                Factor::Formula(_) => println!("add to factor {:?}", f),
-            }
+            factor.value_mut().level += amount;
         });
         self.propogate_changes(f);
     }
 
-    pub fn set_factor(&self, f: &(S, F), amount: f32) {
+    pub fn set_factor(&self, f: &FactorType, amount: f32) {
         self.factors.get_mut(f).map(|mut factor| {
-            match factor.value_mut() {
-                Factor::Constant(n) => *n = amount,
-                Factor::Decay(n, _) => *n = amount,
-                Factor::Formula(_) => println!("add to factor {:?}", f),
-            }
+            factor.value_mut().level = amount;
         });
         self.propogate_changes(f);
     }
 
-    pub fn insert_factor(&self, f: &(S, F), amount: f32) {
-        self.factors.insert(f.clone(), Factor::Constant(amount));
+    pub fn insert_factor(&self, f: &FactorType, amount: f32) {
+        self.factors.insert(f.clone(), Factor::new_amount(amount));
     }
 
-    pub fn get_factor(&self, f: &(S, F)) -> f32 {
+    pub fn get_factor(&self, f: &FactorType) -> f32 {
         self.factors.get(f).map(|factor| {
-            match factor.value() {
-                Factor::Constant(n) => *n,
-                Factor::Decay(n, _) => *n,
-                Factor::Formula(formula_id) => self.formula_value(*formula_id),
+            let f = factor.value();
+            if let Some(formula_id) = f.formula {
+                self.formula_value(formula_id);
             }
         }).unwrap_or(0.0)
     }
 
-    pub fn get_formula(&self, f: &(S, F)) -> FormulaName {
+    pub fn get_formula(&self, f: &FactorType) -> FormulaId {
         let factor = self.factors.get(f).unwrap();
         match factor.value() {
             Factor::Formula(formula_id) => *formula_id,
@@ -160,7 +148,7 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
     }
 
     // retrieve formulae that change as a result of f changing
-    pub fn get_formulae(&self, f: &(S, F)) -> Vec<FormulaName> {
+    pub fn get_formulae(&self, f: &FactorType) -> Vec<FormulaId> {
         self
             .input_map
             .get(f)
@@ -172,26 +160,28 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
     }
 
     // given that f changed, update values of all descendant formulae
-    fn propogate_changes(&self, f: &(S, F)) {
+    fn propogate_changes(&self, f: &FactorType) {
         for &formula_id in self.get_formulae(f).iter() {
             // println!("update formula {:?}", formula_id);
             let formula = &self.formulae[formula_id.0];
             // only really calc if there are more down the line, otherwise mark dirty
             if self.input_map.get(&formula.subject).map(|v| v.len()).unwrap_or(0) > 0 {
-                let before = self.formula_value(formula_id);
-                self.calc_formula(formula_id);
-                let after = self.formula_value(formula_id);
-                // only recalc if value actually changed (highly likely)
-                if before != after {
-                    self.propogate_changes(&formula.subject);
+                if true {
+                    self.dirty_formula(formula_id);
+                } else {
+                    let before = self.formula_value(formula_id);
+                    self.calc_formula(formula_id);
+                    let after = self.formula_value(formula_id);
                 }
+                // only recalc if value actually changed (highly likely)
+                self.propogate_changes(&formula.subject);
             } else {
                 self.dirty_formula(formula_id);
             }
         }
     }
 
-    fn formula_value(&self, formula_id: FormulaName) -> f32 {
+    fn formula_value(&self, formula_id: FormulaId) -> f32 {
         {
             if let Some(val) = self.formula_values.get(&formula_id) {
                 if !val.dirty {
@@ -211,7 +201,7 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
         }
     }
 
-    fn fetch_inputs(&self, inputs: &Vec<(S, F)>) -> Vec<f32> {
+    fn fetch_inputs(&self, inputs: &Vec<FactorType>) -> Vec<f32> {
         let mut res = Vec::new();
         for input in inputs.iter() {
             res.push(self.get_factor(input));
@@ -219,19 +209,19 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
         res
     }
 
-    fn dirty_formula(&self, formula_id: FormulaName) {
+    fn dirty_formula(&self, formula_id: FormulaId) {
         if let Some(mut val) = self.formula_values.get_mut(&formula_id) {
             val.value_mut().dirty = true;
         }
     }
 
-    fn calc_formula(&self, formula_id: FormulaName) -> f32 {
+    fn calc_formula(&self, formula_id: FormulaId) -> f32 {
         let formula = &self.formulae[formula_id.0];
         let value = formula.calc(self.fetch_inputs(&formula.inputs));
         value
     }
 
-    fn add_input(&mut self, f: &(S, F), formula_id: FormulaName) {
+    fn add_input(&mut self, f: &FactorType, formula_id: FormulaId) {
         self
             .input_map
             .entry(f.clone())
@@ -239,9 +229,9 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
             .push(formula_id);
     }
 
-    pub fn add_formula(&mut self, formula: Formula<S, F>) -> FormulaName {
+    pub fn add_formula(&mut self, subject: &FactorType, formula: Formula) -> FormulaId {
         let idx = self.formulae.len();
-        let formula_id = FormulaName(idx);
+        let formula_id = FormulaId(idx);
         for input in formula.inputs.iter() {
             self.add_input(input, formula_id);
         }
@@ -249,13 +239,13 @@ impl<S, F> FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
             cached: 0.0,
             dirty: true,
         });
-        self.factors.insert(formula.subject.clone(), Factor::Formula(formula_id));
+        self.factors.insert(subject.clone(), Factor::new_formula(formula_id));
         self.formulae.push(formula);
         formula_id
     }
 }
 
-impl<S, F> Default for FormulaSystem<S, F> where S: FactorSubject, F: FactorField {
+impl Default for FormulaSystem {
     fn default() -> Self {
         Self { factors: Default::default(), formulae: Default::default(), input_map: Default::default(), formula_values: Default::default() }
     }
