@@ -584,6 +584,7 @@ pub enum SettlementFeature {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SettlementLevel {
+    None,
     Hamlet,
     Village,
     Town,
@@ -594,6 +595,7 @@ pub enum SettlementLevel {
 impl SettlementLevel {
     pub fn rating(&self) -> f32 {
         match *self {
+            SettlementLevel::None => 0.0,
             SettlementLevel::Hamlet => 5.0,
             SettlementLevel::Village => 10.0,
             SettlementLevel::Town => 20.0,
@@ -603,7 +605,22 @@ impl SettlementLevel {
     }
 }
 
-#[derive(IronData, Serialize, Deserialize)]
+pub enum LandscapeType {
+    Farmlands, // the usual
+    Forest, // be turned into farmlands via slash and burn
+    Pasture, // baah
+    Wastes, // slightly more likely to have ore deposits but otherwise useless
+    Vinyards, // just grapes
+    OliveOrchards, // just olives (find better name)
+
+}
+
+pub struct Landscape {
+
+}
+
+
+#[iron_data]
 pub struct Settlement {
     pub id: usize,
     pub name: String,
@@ -617,8 +634,6 @@ pub struct Settlement {
     pub successor_law: SuccessorLaw,
     pub ruined: bool,
 }
-
-gen_id!(Settlement, SettlementId);
 
 impl Featured<SettlementFeature> for Settlement {
     fn has_feature(&self, feature: SettlementFeature) -> bool {

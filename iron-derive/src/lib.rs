@@ -13,10 +13,11 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
     let name_id_str = format!("{}", name_id);
 
     let expanded = quote! {
-        #[derive(IronId, Clone)]
+        #[derive(IronId, Clone, Serialize, Deserialize)]
         pub struct #name_id {
             num: usize,
-            inner: IronIdInner<#name>,
+            #[serde(skip)]
+            inner: Option<IronIdInner<#name>>,
         }
 
         impl PartialEq for #name_id {

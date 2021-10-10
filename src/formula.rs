@@ -102,10 +102,11 @@ pub struct FormulaValue {
     pub dirty: bool,
 }
 
+#[derive(Default)]
 pub struct FormulaSystem {
     factors: DashMap<FactorType, Factor>,
     formulae: Vec<Formula>,
-    input_map: HashMap<FactorType, Vec<FormulaId>>,
+    input_map: HashMap<FormulaId, Vec<FactorType>>,
     formula_values: DashMap<FormulaId, FormulaValue>,
     formula_subjects: DashMap<FormulaId, FactorType>,
 }
@@ -162,19 +163,13 @@ impl FormulaSystem {
     // given that f changed, update values of all descendant formulae
     fn propogate_changes(&self, f: &FactorType) {
         for &formula_id in self.get_formulae(f).iter() {
+            self.dirty_formula(formula_id);
             // println!("update formula {:?}", formula_id);
             let formula = &self.formulae[formula_id.0];
             // only really calc if there are more down the line, otherwise mark dirty
-            if self.input_map.get(&formula.subject).map(|v| v.len()).unwrap_or(0) > 0 {
+            if self.input_map.get().map(|v| v.len()).unwrap_or(0) > 0 {
                 if true {
-                    self.dirty_formula(formula_id);
-                } else {
-                    let before = self.formula_value(formula_id);
-                    self.calc_formula(formula_id);
-                    let after = self.formula_value(formula_id);
                 }
-                // only recalc if value actually changed (highly likely)
-                self.propogate_changes(&formula.subject);
             } else {
                 self.dirty_formula(formula_id);
             }
@@ -245,8 +240,8 @@ impl FormulaSystem {
     }
 }
 
-impl Default for FormulaSystem {
-    fn default() -> Self {
-        Self { factors: Default::default(), formulae: Default::default(), input_map: Default::default(), formula_values: Default::default() }
-    }
-}
+// impl Default for FormulaSystem {
+//     fn default() -> Self {
+//         Self { factors: Default::default(), formulae: Default::default(), input_map: Default::default(), formula_values: Default::default() }
+//     }
+// }
