@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use lazy_static::lazy_static;
 use rand::{prelude::SliceRandom, random, thread_rng};
 use std::{cell::{Ref, RefCell, RefMut}, collections::{HashMap, HashSet, VecDeque}, fmt::{Debug, Display}, hash::Hash, marker::PhantomData, ops::{Deref, DerefMut}, rc::{Rc, Weak}, slice::Iter, sync::Arc, time::Duration};
-use parking_lot::RwLock;
+use parking_lot::{RwLock, lock_api::RwLock};
 pub use GoodType::*;
 
 pub const TILE_SIZE_X: f32 = 16.0;
@@ -381,7 +381,7 @@ pub enum ProvinceFeature {
 }
 
 use SettlementFeature::*;
-#[derive(IronData, Serialize, Deserialize)]
+#[iron_data]
 pub struct Province {
     pub id: usize,
     pub settlement: Option<SettlementId>,
@@ -394,8 +394,6 @@ pub struct Province {
     pub harvest_month: usize,
     pub coastal: bool,
 }
-
-gen_id!(Province, ProvinceId);
 
 impl Province {
     pub fn population(&self, world: &World) -> isize {
@@ -546,7 +544,7 @@ pub enum SuccessorLaw {
     Election,
 }
 
-#[derive(IronData, Serialize, Deserialize)]
+#[iron_data]
 pub struct Polity {
     pub id: usize,
     pub name: String,
@@ -556,8 +554,6 @@ pub struct Polity {
     pub leader: CharacterId,
     pub successor_law: SuccessorLaw,
 }
-
-gen_id!(Polity, PolityId);
 
 #[derive(Clone, Debug)]
 pub struct Site {
@@ -824,7 +820,7 @@ impl Hash for TechLevel {
     }
 }
 
-pub struct IronIdInner<T>(pub Rc<RefCell<T>>) where T: Sized;
+pub struct IronIdInner<T>(pub Arc<RwLock<T>>) where T: Sized;
 
 impl<T> Clone for IronIdInner<T> {
     fn clone(&self) -> Self {
@@ -833,87 +829,32 @@ impl<T> Clone for IronIdInner<T> {
 }
 
 impl <T> IronIdInner<T> {
-    pub fn get_inner_ref<'a>(&'a self) -> impl Deref<Target = T> + 'a {
-        self.0.borrow()
+    pub fn get<'a>(&'a self) -> impl Deref<Target = T> + 'a {
+        self.0.read()
     }
-    pub fn borrow<'a>(&'a self) -> Ref<'a, T> {
-        self.0.borrow()
-    }
-    pub fn borrow_mut<'a>(&'a self) -> RefMut<'a, T> {
-        self.0.borrow_mut()
+
+    pub fn get_mut<'a>(&'a self) -> impl DerefMut<Target = T> + 'a {
+        self.0.write()
     }
 }
 
 pub trait IronId {
     type Target: IronData<IdType = Self> + Sized;
-    fn new(id: usize, inner: IronIdInner<Self::Target>) -> Self;
+    fn new(num: usize) -> Self;
     fn num(&self) -> usize;
-    fn get_inner(&self) -> &IronIdInner<Self::Target>;
     fn gid(&self) -> GameId;
-    fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<Self::Target>>>
+}
+
+pub trait IronRef {
+    type Id: IronId + Sized;
+    fn get_inner(&self) -> &IronIdInner<<Self::Id as IronId>::Target>;
+    fn info_container<F>(&self, mapping: F) -> Rc<RefCell<InfoContainer<<Self::Id as IronId>::Target>>>
     where
         F: Fn(Self, &World) -> String + 'static,
         Self: Sized + Clone,
     {
         InfoContainer::<Self::Target>::new((*self).clone(), Box::new(mapping))
     }
-    fn factor(&self, world: &World, ftype: FactorType) -> f32 {
-        world.formula_system.get_factor(&(self.gid(), ftype))
-    }
-}
-
-// impl Serialize for PopId {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer {
-//         let mut state = serializer.serialize_struct("PopId", 2)?;
-//         state.serialize_field("num", &self.num());
-//         state.end()
-//     }
-// }
-
-#[macro_export]
-macro_rules! gen_id {
-	($data:ident,$id:ident) => {
-        #[derive(IronId, Clone, Serialize, Deserialize)]
-        pub struct $id {
-            num: usize,
-            #[serde(skip)]
-            inner: Option<IronIdInner<$data>>,
-        }
-
-        impl PartialEq for $id {
-            fn eq(&self, other: &Self) -> bool {
-                self.num == other.num
-            }
-        }
-
-        impl Eq for $id {}
-
-        impl std::hash::Hash for $id {
-            fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-                self.num.hash(state);
-            }
-        }
-
-        impl std::fmt::Debug for $id {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str(format!("{}({})", stringify!($id), self.num).as_str())
-            }
-        }
-
-        // pub type #name_ptr = std::rc::Rc<std::cell::RefCell<#name>>;
-
-        impl $id {
-            pub fn get<'a>(&'a self) -> std::cell::Ref<'a, $data> {
-                self.get_inner().borrow()
-            }
-
-            pub fn get_mut<'a>(&'a self) -> std::cell::RefMut<'a, $data> {
-                self.get_inner().borrow_mut()
-            }
-        }
-	};
 }
 
 pub trait IronData {

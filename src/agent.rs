@@ -36,7 +36,7 @@ impl Title {
     }
 }
 
-#[derive(IronData, Serialize, Deserialize)]
+#[iron_data]
 pub struct Character {
     pub id: usize,
     pub name: String,
@@ -47,8 +47,6 @@ pub struct Character {
     pub features: HashSet<CharacterFeature>,
     pub titles: Vec<Title>,
 }
-
-gen_id!(Character, CharacterId);
 
 impl Featured<CharacterFeature> for Character {
     fn has_feature(&self, feature: CharacterFeature) -> bool {

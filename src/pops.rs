@@ -14,7 +14,7 @@ pub struct MigrationStatus {
     pub settlement: Option<SettlementId>,
 }
 
-#[derive(IronData, Serialize, Deserialize)]
+#[iron_data]
 pub struct Pop {
     pub id: usize,
     pub size: isize,
@@ -28,8 +28,6 @@ pub struct Pop {
     pub migration_status: Option<MigrationStatus>,
     pub polity: PolityId,
 }
-
-gen_id!(Pop, PopId);
 
 impl Pop {
     pub fn good_satiety(&self, good: GoodType) -> Satiety {
@@ -111,7 +109,7 @@ pub fn harvest(pop: &PopId, world: &World) {
     }
 }
 
-#[derive(IronData, Serialize, Deserialize)]
+#[iron_data]
 pub struct Language {
     pub id: usize,
     pub name: String,
@@ -120,8 +118,6 @@ pub struct Language {
     pub middle_consonants: Vec<String>,
     pub end_consonants: Vec<String>,
 }
-
-gen_id!(Language, LanguageId);
 
 fn list_filter_chance(list: &Vec<String>, chance: f32) -> Vec<String> {
     list.iter()
@@ -204,7 +200,7 @@ pub enum CultureFeature {
     Seafaring,
 }
 
-#[derive(IronData)]
+#[iron_data]
 pub struct Culture {
     pub id: usize,
     pub name: String,
@@ -212,8 +208,6 @@ pub struct Culture {
     pub language: LanguageId,
     pub features: Vec<CultureFeature>,
 }
-
-gen_id!(Culture, CultureId);
 
 impl Culture {
     pub fn generate_character(&self, sex: Sex, age: isize, world: &mut World) -> CharacterId {
@@ -230,10 +224,8 @@ impl Culture {
     }
 }
 
-#[derive(IronData)]
+#[iron_data]
 pub struct Religion {
     pub id: usize,
     pub name: String,
 }
-
-gen_id!(Religion, ReligionId);

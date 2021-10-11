@@ -42,6 +42,11 @@ pub trait FactorField: Clone + Eq + Hash + Debug {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FormulaId(usize);
 
+pub enum FormulaName {
+    SettlementHarvest,
+    PopHarvest,
+
+}
 
 pub enum FormulaFn {
     VecArgs(Arc<dyn Fn(Vec<f32>) -> f32 + Send + Sync>),
@@ -167,7 +172,7 @@ impl FormulaSystem {
             // println!("update formula {:?}", formula_id);
             let formula = &self.formulae[formula_id.0];
             // only really calc if there are more down the line, otherwise mark dirty
-            if self.input_map.get().map(|v| v.len()).unwrap_or(0) > 0 {
+            if self.input_map.get(formula_id).map(|v| v.len()).unwrap_or(0) > 0 {
                 if true {
                 }
             } else {
@@ -219,9 +224,9 @@ impl FormulaSystem {
     fn add_input(&mut self, f: &FactorType, formula_id: FormulaId) {
         self
             .input_map
-            .entry(f.clone())
+            .entry(formula_id)
             .or_default()
-            .push(formula_id);
+            .push(f.clone());
     }
 
     pub fn add_formula(&mut self, subject: &FactorType, formula: Formula) -> FormulaId {

@@ -9,15 +9,26 @@ pub fn iron_data(attr: TokenStream, input: TokenStream) -> TokenStream {
     let parsed_input = parse_macro_input!(input as DeriveInput);
     let name = &parsed_input.ident;
     let name_id = format_ident!("{}Id", name);
+    let name_ref = format_ident!("{}Ref", name);
     let name_ptr = format_ident!("{}Ptr", name);
     let name_id_str = format!("{}", name_id);
 
     let expanded = quote! {
-        #[derive(IronId, Clone, Serialize, Deserialize)]
+        #[derive(IronId, Copy, Clone, Serialize, Deserialize)]
         pub struct #name_id {
             num: usize,
-            #[serde(skip)]
-            inner: Option<IronIdInner<#name>>,
+        }
+
+        #[derive(IronRef, Clone)]
+        pub struct #name_ref {
+            id: #name_id,
+            inner: IronIdInner<#name>,
+        }
+
+        impl From<#name_ref> for #name_id {
+            fn from(sr: SettlementRef) -> Self {
+                sr.id
+            }
         }
 
         impl PartialEq for #name_id {
@@ -77,6 +88,38 @@ pub fn iron_id_derive(input: TokenStream) -> TokenStream {
         impl #impl_generics crate::game::IronId for #name #ty_generics #where_clause {
             type Target = #target;
 
+            fn new(num: usize) -> Self {
+                Self {
+                    num,
+                }
+            }
+
+            fn num(&self) -> usize {
+                self.num
+            }
+            fn gid(&self) -> GameId {
+                GameId::#target(self.num())
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[proc_macro_derive(IronRef)]
+pub fn iron_ref_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let target = format_ident!("{}", name.to_string().replace("Ref", ""));
+    let id = format_ident!("{}", name.to_string().replace("Ref", "Id"));
+    let generics = input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let expanded = quote! {
+        impl #impl_generics crate::game::IronRef for #name #ty_generics #where_clause {
+            type Target = #target;
+            type Id = #id;
+
             fn new(num: usize, inner: IronIdInner<Self::Target>) -> Self {
                 Self {
                     num,
@@ -84,16 +127,8 @@ pub fn iron_id_derive(input: TokenStream) -> TokenStream {
                 }
             }
 
-            fn num(&self) -> usize {
-                self.num
-            }
-
             fn get_inner<'a>(&'a self) -> &'a IronIdInner<Self::Target> {
                 self.inner.as_ref().unwrap()
-            }
-
-            fn gid(&self) -> GameId {
-                GameId::#target(self.num())
             }
         }
     };

@@ -102,6 +102,7 @@ impl FactorSubject for GameId {
 //     }
 // }
 
+/// Factors represent
 #[derive(Serialize, Deserialize)]
 pub struct Factor {
     pub level: f32,
